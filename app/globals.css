@@ -1,0 +1,27 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Tema escuro como padrão (paleta do briefing) */
+  --background: 240 4% 3%;
+  --surface: 240 4% 7%;
+  --border: 240 5% 13%;
+
+  --text-primary: 45 15% 94%;
+  --text-secondary: 45 3% 60%;
+
+  --accent: 160 69% 36%;
+  --warning: 35 86% 54%;
+  --danger: 0 72% 59%;
+  --info: 210 68% 54%;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  @apply bg-background text-foreground font-sans;
+}

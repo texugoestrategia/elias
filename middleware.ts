@@ -13,14 +13,13 @@ export async function middleware(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get(name) {
-          return request.cookies.get(name)?.value
+        getAll() {
+          return request.cookies.getAll()
         },
-        set(name, value, options) {
-          response.cookies.set({ name, value, ...options })
-        },
-        remove(name, options) {
-          response.cookies.set({ name, value: "", ...options })
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) => {
+            response.cookies.set({ name, value, ...options })
+          })
         },
       },
     }
@@ -31,7 +30,9 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   const isLogin = request.nextUrl.pathname.startsWith("/login")
-  if (!user && !isLogin) {
+  const isAuthConfirm = request.nextUrl.pathname.startsWith("/auth/confirm")
+  const isAuthCodeError = request.nextUrl.pathname.startsWith("/auth/auth-code-error")
+  if (!user && !isLogin && !isAuthConfirm && !isAuthCodeError) {
     const url = new URL("/login", request.url)
     return NextResponse.redirect(url)
   }
@@ -47,4 +48,3 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 }
-

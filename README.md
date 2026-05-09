@@ -22,6 +22,20 @@ cp .env.example .env.local
 ```
 Depois, crie um usuário no Supabase Auth (email/senha) e use ele para entrar.
 
+### Recuperação de senha (recomendado)
+
+Para o fluxo de recuperação funcionar com SSR (PKCE), configure o template de email no Supabase:
+
+Supabase → Authentication → Email Templates → **Reset Password**
+
+Use um link no formato:
+
+```html
+<a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery&next=/account/update-password">Reset Password</a>
+```
+
+Depois disso, na tela `/login` você pode clicar em “Enviar link de recuperação”.
+
 ### 3) Rodar em desenvolvimento
 
 ```bash

@@ -3,7 +3,7 @@
 Projeto inicializado conforme o briefing:
 - Next.js 14 (App Router)
 - Tailwind CSS
-- Stubs para Supabase e NextAuth (Azure AD)
+- Supabase (Auth + Postgres)
 
 ## Getting Started
 
@@ -20,11 +20,7 @@ Copie o arquivo `.env.example` para `.env.local` e preencha:
 ```bash
 cp .env.example .env.local
 ```
-
-Para o login de teste (temporário), configure:
-
-- `TEST_USER_USERNAME=elias`
-- `TEST_USER_PASSWORD=3lias@321`
+Depois, crie um usuário no Supabase Auth (email/senha) e use ele para entrar.
 
 ### 3) Rodar em desenvolvimento
 
@@ -37,9 +33,9 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 ### Estrutura (resumo)
 
 - `app/(dashboard)/*` — telas base (dashboard/parceiros/time/processos/editais)
-- `app/(auth)/login` — tela de login (placeholder)
-- `auth.ts` + `app/api/auth/[...nextauth]/route.ts` — NextAuth (Azure AD)
+- `app/(auth)/login` — tela de login (Supabase Auth)
 - `lib/supabase/*` — clientes Supabase (browser/server)
+- `middleware.ts` — proteção de rotas + refresh de sessão do Supabase
 
 ## Deploy na Vercel (resumo)
 

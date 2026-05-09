@@ -8,7 +8,7 @@ export default function LoginPage() {
           Entrar
         </h1>
         <p className="text-sm text-muted">
-          Por enquanto estamos usando um usuário de teste (Credentials). Depois trocamos para Azure AD (SSO).
+          Autenticação via Supabase Auth (email e senha). Depois podemos trocar para Azure AD (SSO).
         </p>
         <SignInForm />
       </div>

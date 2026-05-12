@@ -121,6 +121,8 @@ function fieldCatalog(): FieldOption[] {
   ]
 }
 
+const GROUP_PRESETS = ["Elegibilidade", "Técnico", "Financeiro", "Operacional", "Jurídico", "Qualidade"] as const
+
 function operatorOptions(valueType: FieldOption["valueType"]): Array<{ op: Operator; label: string }> {
   const common = [
     { op: "present" as const, label: "Está presente" },
@@ -397,6 +399,7 @@ function RuleCard({
   onDelete: () => void
 }) {
   const collapsed = Boolean(rule.collapsed)
+  const groupValue = (rule.group ?? "").trim()
   return (
     <div className="rounded-lg border border-border bg-surface p-4 space-y-3">
       <div className="flex items-start justify-between gap-3">
@@ -420,12 +423,35 @@ function RuleCard({
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-            <input
-              value={rule.group ?? ""}
-              onChange={(e) => onChange({ ...rule, group: e.target.value })}
+            <select
+              value={GROUP_PRESETS.includes(groupValue as any) ? groupValue : groupValue ? "__outro__" : ""}
+              onChange={(e) => {
+                const v = e.target.value
+                if (v === "__outro__") onChange({ ...rule, group: groupValue || "Outro" })
+                else onChange({ ...rule, group: v })
+              }}
               className="rounded-md border border-border bg-background px-3 py-2 text-sm"
-              placeholder="Grupo (ex.: Elegibilidade / Financeiro / Técnico)"
-            />
+              title="Grupo"
+            >
+              <option value="">Sem grupo</option>
+              {GROUP_PRESETS.map((g) => (
+                <option key={g} value={g}>
+                  {g}
+                </option>
+              ))}
+              <option value="__outro__">Outro…</option>
+            </select>
+
+            {!GROUP_PRESETS.includes(groupValue as any) && groupValue ? (
+              <input
+                value={rule.group ?? ""}
+                onChange={(e) => onChange({ ...rule, group: e.target.value })}
+                className="rounded-md border border-border bg-background px-3 py-2 text-sm"
+                placeholder="Nome do grupo"
+              />
+            ) : (
+              <div className="hidden md:block" />
+            )}
             <button
               type="button"
               onClick={() => onChange({ ...rule, collapsed: !collapsed })}
@@ -666,7 +692,36 @@ function ConditionEditor({
     }
 
     if (node.operator === "in" || node.operator === "not_in") {
-      const v = Array.isArray(node.value) ? node.value.join(",") : String(node.value ?? "")
+      // para enums, usamos multi-select com checkboxes (menos erro)
+      if (selected.valueType === "enum") {
+        const options =
+          selected.key === "modality"
+            ? ["pregao", "concorrencia", "dispensa", "desconhecido"]
+            : ["horario_comercial", "4h", "8h"]
+        const arr = Array.isArray(node.value) ? (node.value as any[]) : []
+        return (
+          <div className="rounded-md border border-border bg-background px-3 py-2 text-sm space-y-1">
+            {options.map((opt) => {
+              const checked = arr.includes(opt)
+              return (
+                <label key={opt} className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={(e) => {
+                      const next = e.target.checked ? [...arr, opt] : arr.filter((x) => x !== opt)
+                      onChange({ ...node, value: next })
+                    }}
+                  />
+                  <span>{opt}</span>
+                </label>
+              )
+            })}
+          </div>
+        )
+      }
+
+      const v = Array.isArray(node.value) ? node.value.join(", ") : String(node.value ?? "")
       return (
         <input
           value={v}

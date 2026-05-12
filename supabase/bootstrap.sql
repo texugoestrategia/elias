@@ -1096,8 +1096,28 @@ begin
   end if;
 end $$;
 
--- Obs: não dá para atribuir admin automaticamente aqui sem saber seu user_id.
--- Para promover seu usuário a admin:
+-- Promoção automática (segura) do 1º usuário para ADMIN:
+-- Se existir exatamente 1 usuário no auth.users, ele ganha role 'admin' automaticamente.
+-- Em ambientes com mais de um usuário, use o procedimento manual abaixo.
+do $$
+declare
+  users_count int;
+  u_id uuid;
+  admin_role uuid;
+begin
+  select count(*) into users_count from auth.users;
+  if users_count = 1 then
+    select id into u_id from auth.users limit 1;
+    select id into admin_role from public.app_roles where key='admin' limit 1;
+    if u_id is not null and admin_role is not null then
+      insert into public.user_roles(user_id, role_id)
+      values (u_id, admin_role)
+      on conflict do nothing;
+    end if;
+  end if;
+end $$;
+
+-- Manual (se necessário):
 -- 1) select id, email from auth.users order by created_at desc;
 -- 2) select id from public.app_roles where key='admin';
 -- 3) insert into public.user_roles(user_id, role_id) values ('<user_id>', '<admin_role_id>');

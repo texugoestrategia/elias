@@ -70,6 +70,20 @@ Isso cria:
 - `public.process_kpis` e `public.process_kpi_values`
 - bucket `process-assets` (anexos)
 
+## Editais (lotes + pipeline + regras)
+
+1. Supabase → SQL Editor → New query
+2. Cole o conteúdo de `supabase/editais.sql`
+3. Run
+
+Isso cria:
+- `public.edital_batches`, `public.edital_files`, `public.editais`, `public.edital_jobs`
+- artefatos reexecutáveis por estágio (`edital_extractions`, `edital_classifications`, `edital_normalizations`, `edital_evaluations`)
+- regras versionadas em JSON (`edital_rule_sets`, `edital_rule_set_versions`)
+- notificações (`user_notifications`)
+- RPC `public.claim_next_edital_job(batch_id)` (simula fila/worker)
+- bucket `editais` (arquivos)
+
 ## Organograma (posições + subordinação)
 
 1. Supabase → SQL Editor → New query

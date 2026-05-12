@@ -2,15 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react"
 
-export function AppLogo({ size = 32 }: { size?: number }) {
+export function AppLogo({ size = 40 }: { size?: number }) {
   const [broken, setBroken] = useState(false)
   const [theme, setTheme] = useState<"light" | "dark">("dark")
 
   useEffect(() => {
     const root = document.documentElement
-    const mode = (root.dataset.themeMode ?? "dark") as "light" | "dark" | "system"
-
     const compute = () => {
+      const mode = (root.dataset.themeMode ?? "dark") as "light" | "dark" | "system"
       if (mode === "system") {
         return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"
       }
@@ -19,11 +18,22 @@ export function AppLogo({ size = 32 }: { size?: number }) {
 
     setTheme(compute())
 
-    if (mode === "system" && window.matchMedia) {
+    // Atualiza automaticamente se o usuário alternar tema via preferências (dataset muda no <html>)
+    const mo = new MutationObserver(() => setTheme(compute()))
+    mo.observe(root, { attributes: true, attributeFilter: ["data-theme-mode", "data-theme"] })
+
+    // Também reage ao change do sistema quando estiver em "system"
+    let cleanupMql = () => {}
+    if (window.matchMedia) {
       const mql = window.matchMedia("(prefers-color-scheme: dark)")
       const handler = () => setTheme(compute())
       mql.addEventListener?.("change", handler)
-      return () => mql.removeEventListener?.("change", handler)
+      cleanupMql = () => mql.removeEventListener?.("change", handler)
+    }
+
+    return () => {
+      mo.disconnect()
+      cleanupMql()
     }
   }, [])
 
@@ -39,7 +49,7 @@ export function AppLogo({ size = 32 }: { size?: number }) {
     <img
       src={src}
       alt="Mimir"
-      className="rounded-md border border-border bg-background object-contain"
+      className="object-contain"
       style={{ height: size, width: size }}
       onError={(e) => {
         // fallback simples: se o logo2 não existir ainda, cai pro logo padrão

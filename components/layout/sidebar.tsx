@@ -55,7 +55,7 @@ export async function Sidebar() {
       <div className="px-4 py-4 border-b border-border">
         <div className="flex items-center gap-3">
           {/* Se existir em public/img/logo.png, ele aparece aqui. */}
-          <AppLogo size={32} />
+          <AppLogo size={44} />
           <div>
             <div className="text-lg font-semibold" style={{ fontFamily: "var(--font-display)" }}>
               Mimir

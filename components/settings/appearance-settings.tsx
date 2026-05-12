@@ -61,6 +61,18 @@ export function AppearanceSettings({ initial }: { initial: UserPreferences }) {
       document.documentElement.style.setProperty(k, String(v))
     }
     document.body.classList.toggle("dense", !!next.dense_mode)
+
+    // Mantém data-attrs em sincronia (para o logo alternar light/dark sem refresh)
+    document.documentElement.dataset.themeMode = next.theme_mode
+    const resolved =
+      next.theme_mode === "light"
+        ? "light"
+        : next.theme_mode === "dark"
+          ? "dark"
+          : window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches
+            ? "dark"
+            : "light"
+    document.documentElement.dataset.theme = resolved
   }
 
   const save = async () => {

@@ -106,6 +106,8 @@ values
   ('catalog.manage', 'Gerir Catálogo', 'Criar/editar catálogo de produtos/serviços de parceiros'),
   ('process.view', 'Ver Processos', 'Visualizar processos e detalhes'),
   ('process.manage', 'Gerir Processos', 'Criar/editar processos, anexos e KPIs'),
+  ('editais.manage', 'Gerir Editais', 'Subir lotes, acompanhar pipeline e corrigir exceções'),
+  ('editais.rules.manage', 'Gerir Regras de Editais', 'Criar/versionar regras de elegibilidade e pontuação'),
   ('reports.generate', 'Gerar Relatórios', 'Gerar e baixar relatórios mensais'),
   ('rbac.manage', 'Gerir RBAC', 'Gerir papéis e permissões')
 on conflict (key) do nothing;

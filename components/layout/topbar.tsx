@@ -9,6 +9,7 @@ export function Topbar() {
   const [name, setName] = useState<string | null>(null)
   const [email, setEmail] = useState<string | null>(null)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+  const [unread, setUnread] = useState<number>(0)
 
   useEffect(() => {
     const supabase = createClient()
@@ -47,6 +48,15 @@ export function Topbar() {
         setName(fullName)
         setAvatarUrl(pic)
       }
+
+      if (u?.id) {
+        const { count } = await supabase
+          .from("user_notifications")
+          .select("*", { count: "exact", head: true })
+          .eq("user_id", u.id)
+          .is("read_at", null)
+        setUnread(count ?? 0)
+      }
     })()
   }, [])
 
@@ -75,6 +85,11 @@ export function Topbar() {
             {email && name !== email ? <div className="text-[11px] text-muted">{email}</div> : null}
           </div>
         </div>
+        {unread > 0 ? (
+          <div className="rounded-full bg-accent px-2 py-1 text-[11px] font-medium text-black" title="Notificações">
+            {unread}
+          </div>
+        ) : null}
         <button
           type="button"
           onClick={onSignOut}

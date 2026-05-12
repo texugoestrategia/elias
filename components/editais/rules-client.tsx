@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
+import { RuleBuilder, normalizeRulesFromTreeJson, toTreeJsonFromRules, type RuleRowUI } from "@/components/editais/rule-builder"
 
 type RuleSet = {
   id: string
@@ -73,6 +74,10 @@ export function EditaisRulesClient({
   const [jsonText, setJsonText] = useState<string>(() =>
     selectedVersion ? JSON.stringify(selectedVersion.tree, null, 2) : JSON.stringify({ rules: [] }, null, 2)
   )
+  const [mode, setMode] = useState<"didatico" | "json">("didatico")
+  const [rulesUi, setRulesUi] = useState<RuleRowUI[]>(() =>
+    normalizeRulesFromTreeJson(selectedVersion?.tree ?? { rules: [] })
+  )
 
   const [batchId, setBatchId] = useState<string>(batches[0]?.id ?? "")
   const [dryRunResult, setDryRunResult] = useState<any>(null)
@@ -94,6 +99,13 @@ export function EditaisRulesClient({
     if (vs.error) throw vs.error
     setRuleSets((rs.data ?? []) as any)
     setVersions((vs.data ?? []) as any)
+  }
+
+  // quando troca version/ruleset
+  const loadFromSelectedVersion = (v: RuleSetVersion | null) => {
+    const tree = v?.tree ?? { rules: [] }
+    setJsonText(JSON.stringify(tree, null, 2))
+    setRulesUi(normalizeRulesFromTreeJson(tree))
   }
 
   const createRuleSet = async () => {
@@ -127,7 +139,7 @@ export function EditaisRulesClient({
     try {
       const max = Math.max(0, ...versionsForSet.map((v) => v.version))
       const next = max + 1
-      const tree = JSON.parse(jsonText)
+      const tree = mode === "didatico" ? toTreeJsonFromRules(rulesUi) : JSON.parse(jsonText)
       const { error } = await supabase.from("edital_rule_set_versions").insert({
         rule_set_id: selectedRuleSetId,
         version: next,
@@ -229,7 +241,7 @@ export function EditaisRulesClient({
                   setSelectedRuleSetId(r.id)
                   setSelectedVersionId(null)
                   const first = versions.filter((v) => v.rule_set_id === r.id).sort((a, b) => b.version - a.version)[0]
-                  setJsonText(JSON.stringify(first?.tree ?? { rules: [] }, null, 2))
+                  loadFromSelectedVersion(first ?? null)
                 }}
                 className={
                   "w-full text-left rounded-md border border-border bg-background p-3 hover:border-foreground/20 " +
@@ -301,7 +313,7 @@ export function EditaisRulesClient({
                 type="button"
                 onClick={() => {
                   setSelectedVersionId(v.id)
-                  setJsonText(JSON.stringify(v.tree, null, 2))
+                  loadFromSelectedVersion(v)
                 }}
                 className={
                   "rounded-md border border-border bg-background px-3 py-1.5 text-xs hover:border-foreground/20 " +
@@ -314,13 +326,62 @@ export function EditaisRulesClient({
             {!versionsForSet.length ? <div className="text-xs text-muted">Sem versões ainda.</div> : null}
           </div>
 
-          <div className="space-y-2">
-            <div className="text-xs text-muted">JSON da regra</div>
-            <textarea
-              value={jsonText}
-              onChange={(e) => setJsonText(e.target.value)}
-              className="w-full rounded-md border border-border bg-background px-3 py-2 font-mono text-xs min-h-[320px]"
-            />
+          <div className="rounded-md border border-border bg-background p-3 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="text-sm font-medium">Construtor de regras</div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setMode("didatico")}
+                  className={
+                    "rounded-md border border-border px-3 py-1.5 text-xs " +
+                    (mode === "didatico" ? "bg-background" : "bg-surface hover:border-foreground/20")
+                  }
+                >
+                  Didático
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMode("json")}
+                  className={
+                    "rounded-md border border-border px-3 py-1.5 text-xs " +
+                    (mode === "json" ? "bg-background" : "bg-surface hover:border-foreground/20")
+                  }
+                >
+                  JSON
+                </button>
+              </div>
+            </div>
+
+            {mode === "didatico" ? (
+              <RuleBuilder value={rulesUi} onChange={(v) => setRulesUi(v)} />
+            ) : (
+              <div className="space-y-2">
+                <div className="text-xs text-muted">JSON da regra</div>
+                <textarea
+                  value={jsonText}
+                  onChange={(e) => setJsonText(e.target.value)}
+                  className="w-full rounded-md border border-border bg-background px-3 py-2 font-mono text-xs min-h-[360px]"
+                />
+                <button
+                  type="button"
+                  className="rounded-md border border-border bg-surface px-3 py-2 text-sm hover:border-foreground/20"
+                  onClick={() => {
+                    try {
+                      const parsed = JSON.parse(jsonText)
+                      setRulesUi(normalizeRulesFromTreeJson(parsed))
+                      setMessage("JSON carregado no modo didático.")
+                      setMode("didatico")
+                    } catch (e: any) {
+                      setError(e?.message ?? "JSON inválido")
+                    }
+                  }}
+                >
+                  Carregar JSON no modo didático
+                </button>
+              </div>
+            )}
+
             <div className="text-xs text-muted">
               Dica: o worker usa a última versão <b>published</b> do rule set <code>default</code>.
             </div>

@@ -95,6 +95,11 @@ Isso cria:
 - `public.org_members`
 - função `public.user_id_by_email(email)` (para o app cadastrar subordinação por email)
 
+### Seed (estrutura inicial por funções)
+
+Se você quiser carregar a estrutura do organograma (só cargos/funções), rode:
+- `supabase/organograma_seed.sql`
+
 ## RBAC base (preparação para Processos)
 
 1. Supabase → SQL Editor → New query

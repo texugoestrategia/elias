@@ -1,0 +1,58 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Tema escuro como padrão (paleta do briefing) */
+  --background: 240 4% 3%;
+  --surface: 240 4% 7%;
+  --border: 240 5% 13%;
+
+  --text-primary: 45 15% 94%;
+  --text-secondary: 45 3% 60%;
+
+  --accent: 160 69% 36%;
+  --warning: 35 86% 54%;
+  --danger: 0 72% 59%;
+  --info: 210 68% 54%;
+
+  /* Preferências (customização segura) */
+  --bg-image: none; /* ex.: url("...") */
+  --bg-overlay-opacity: 1; /* quando tiver imagem, reduzir pra manter legibilidade */
+  --font-scale: 1;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+html {
+  font-size: calc(16px * var(--font-scale));
+}
+
+body {
+  @apply bg-background text-foreground font-sans;
+  background-image: var(--bg-image);
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+  position: relative;
+}
+
+/* Overlay para garantir legibilidade quando o usuário usa imagem de fundo */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: hsl(var(--background) / var(--bg-overlay-opacity));
+  z-index: -1;
+}
+
+/* Densidade (modo compacto) */
+body.dense table th,
+body.dense table td {
+  padding-top: 0.35rem;
+  padding-bottom: 0.35rem;
+}

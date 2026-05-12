@@ -7,6 +7,7 @@ const sidebarItems = [
   { id: "/time", label: "Time" },
   { id: "/processos", label: "Processos" },
   { id: "/editais", label: "Editais" },
+  { id: "/relatorios/parceiros", label: "Relatórios" },
   { id: "/configuracoes/aparencia", label: "Aparência" },
   { id: "/configuracoes/layout", label: "Layout" },
 ]

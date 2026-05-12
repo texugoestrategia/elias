@@ -11,7 +11,7 @@ export default async function AparenciaPage() {
   const { data } = user
     ? await supabase
         .from("user_preferences")
-        .select("theme_mode,accent,bg_type,bg_color,bg_image_url,font_scale,dense_mode")
+        .select("theme_mode,accent,accent_custom_hsl,bg_type,bg_color,bg_image_url,font_scale,dense_mode")
         .eq("user_id", user.id)
         .maybeSingle()
     : { data: null }
@@ -20,4 +20,3 @@ export default async function AparenciaPage() {
 
   return <AppearanceSettings initial={initial as any} />
 }
-

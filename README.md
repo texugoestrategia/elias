@@ -51,6 +51,12 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 - `lib/supabase/*` — clientes Supabase (browser/server)
 - `middleware.ts` — proteção de rotas + refresh de sessão do Supabase
 - `supabase/team.sql` — schema do módulo Time (skills/tags, avatar, certificados + buckets)
+- `supabase/bootstrap.sql` — SQL único recomendado (cria tudo + seeds de teste)
+
+## Logo
+
+Se você tiver a imagem em `img/logo.png`, coloque ela em **`public/img/logo.png`** para aparecer na Sidebar.
+(Depois eu configuro o favicon a partir desse mesmo arquivo.)
 
 ## Deploy na Vercel (resumo)
 

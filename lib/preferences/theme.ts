@@ -1,12 +1,13 @@
 export type ThemeMode = "light" | "dark" | "system"
 
-export type AccentKey = "emerald" | "blue" | "violet" | "amber" | "rose"
+export type AccentKey = "emerald" | "blue" | "violet" | "amber" | "rose" | "custom"
 
 export type BgType = "solid" | "image"
 
 export type UserPreferences = {
   theme_mode: ThemeMode
   accent: AccentKey
+  accent_custom_hsl?: string | null
   bg_type: BgType
   bg_color: string | null // HSL triplet: "240 4% 3%"
   bg_image_url: string | null
@@ -17,6 +18,7 @@ export type UserPreferences = {
 export const DEFAULT_PREFERENCES: UserPreferences = {
   theme_mode: "dark",
   accent: "emerald",
+  accent_custom_hsl: null,
   bg_type: "solid",
   bg_color: null,
   bg_image_url: null,
@@ -24,7 +26,7 @@ export const DEFAULT_PREFERENCES: UserPreferences = {
   dense_mode: false,
 }
 
-export const ACCENTS: Record<AccentKey, { label: string; hsl: string }> = {
+export const ACCENTS: Record<Exclude<AccentKey, "custom">, { label: string; hsl: string }> = {
   emerald: { label: "Verde", hsl: "160 69% 36%" },
   blue: { label: "Azul", hsl: "210 80% 56%" },
   violet: { label: "Violeta", hsl: "265 85% 65%" },
@@ -65,16 +67,20 @@ export function toCssVars(prefs?: Partial<UserPreferences>) {
   const overlayOpacity = p.bg_type === "image" && p.bg_image_url ? 0.78 : 1
   const bgImage = p.bg_type === "image" && p.bg_image_url ? `url('${p.bg_image_url}')` : "none"
 
+  const accentHsl =
+    p.accent === "custom" && p.accent_custom_hsl
+      ? p.accent_custom_hsl
+      : ACCENTS[(p.accent as Exclude<AccentKey, "custom">) ?? "emerald"]?.hsl ?? ACCENTS.emerald.hsl
+
   return {
     "--background": background,
     "--surface": palette.surface,
     "--border": palette.border,
     "--text-primary": palette.text_primary,
     "--text-secondary": palette.text_secondary,
-    "--accent": ACCENTS[p.accent]?.hsl ?? ACCENTS.emerald.hsl,
+    "--accent": accentHsl,
     "--bg-image": bgImage,
     "--bg-overlay-opacity": String(overlayOpacity),
     "--font-scale": String(p.font_scale ?? 1),
   } as React.CSSProperties
 }
-

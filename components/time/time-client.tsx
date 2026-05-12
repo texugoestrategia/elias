@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { TagInput } from "@/components/time/tag-input"
+import { RbacClient } from "@/components/time/rbac-client"
+import { OrgChartClient } from "@/components/time/org-chart-client"
 
 type TeamCertificate = {
   id: string
@@ -47,6 +49,7 @@ export function TimeClient({
   const [members, setMembers] = useState<TeamMember[]>(initialMembers)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [view, setView] = useState<"team" | "rbac" | "org">("team")
 
   const [q, setQ] = useState("")
   const [skillFilter, setSkillFilter] = useState<string | null>(null)
@@ -217,6 +220,36 @@ export function TimeClient({
         <div className="flex items-center gap-2">
           <button
             type="button"
+            onClick={() => setView("team")}
+            className={
+              "rounded-md border border-border px-3 py-1.5 text-xs " +
+              (view === "team" ? "bg-background" : "bg-surface hover:border-foreground/20")
+            }
+          >
+            Membros
+          </button>
+          <button
+            type="button"
+            onClick={() => setView("rbac")}
+            className={
+              "rounded-md border border-border px-3 py-1.5 text-xs " +
+              (view === "rbac" ? "bg-background" : "bg-surface hover:border-foreground/20")
+            }
+          >
+            RBAC
+          </button>
+          <button
+            type="button"
+            onClick={() => setView("org")}
+            className={
+              "rounded-md border border-border px-3 py-1.5 text-xs " +
+              (view === "org" ? "bg-background" : "bg-surface hover:border-foreground/20")
+            }
+          >
+            Organograma
+          </button>
+          <button
+            type="button"
             onClick={reload}
             className="rounded-md border border-border bg-background px-3 py-1.5 text-xs hover:border-foreground/20"
           >
@@ -229,6 +262,11 @@ export function TimeClient({
         <div className="rounded-md border border-danger/30 bg-danger/10 p-3 text-sm text-danger">{error}</div>
       ) : null}
 
+      {view === "rbac" ? (
+        <RbacClient />
+      ) : view === "org" ? (
+        <OrgChartClient />
+      ) : (
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Left: filters + list */}
         <section className="lg:col-span-2 space-y-4">
@@ -312,6 +350,7 @@ export function TimeClient({
           />
         </aside>
       </div>
+      )}
     </div>
   )
 }
@@ -619,4 +658,3 @@ function MemberDetailsCard({
     </section>
   )
 }
-

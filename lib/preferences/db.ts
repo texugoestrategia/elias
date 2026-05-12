@@ -11,7 +11,7 @@ export async function getUserPreferences(): Promise<UserPreferences> {
 
   const { data } = await supabase
     .from("user_preferences")
-    .select("theme_mode,accent,bg_type,bg_color,bg_image_url,font_scale,dense_mode")
+    .select("theme_mode,accent,accent_custom_hsl,bg_type,bg_color,bg_image_url,font_scale,dense_mode")
     .eq("user_id", user.id)
     .maybeSingle()
 
@@ -28,4 +28,3 @@ export async function getUserLayout(key: string): Promise<any | null> {
   const { data } = await supabase.from("user_layouts").select("value").eq("user_id", user.id).eq("key", key).maybeSingle()
   return data?.value ?? null
 }
-

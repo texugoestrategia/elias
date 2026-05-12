@@ -7,7 +7,8 @@ create extension if not exists "pgcrypto";
 create table if not exists public.user_preferences (
   user_id uuid primary key, -- auth.users.id
   theme_mode text not null default 'dark' check (theme_mode in ('light','dark','system')),
-  accent text not null default 'emerald', -- chave de cor (paleta controlada no app)
+  accent text not null default 'emerald', -- chave de cor (paleta controlada no app) ou 'custom'
+  accent_custom_hsl text null, -- ex.: "210 80% 56%" (quando accent='custom')
   bg_type text not null default 'solid' check (bg_type in ('solid','image')),
   bg_color text null,       -- ex.: '#0b0b0f' (usado se bg_type=solid)
   bg_image_url text null,   -- URL pública (Supabase Storage)
@@ -16,6 +17,8 @@ create table if not exists public.user_preferences (
   updated_at timestamptz not null default now(),
   created_at timestamptz not null default now()
 );
+
+alter table public.user_preferences add column if not exists accent_custom_hsl text;
 
 alter table public.user_preferences enable row level security;
 
@@ -72,4 +75,3 @@ begin
       with check (bucket_id = 'backgrounds');
   end if;
 end $$;
-

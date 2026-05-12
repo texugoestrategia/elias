@@ -28,6 +28,8 @@ export type RuleRowUI = {
   title: string
   ruleType: "KO" | "SCORE" | "INFO"
   weight?: number
+  group?: string
+  collapsed?: boolean
   message?: string
   when: Tree
 }
@@ -82,6 +84,8 @@ export function normalizeRulesFromTreeJson(treeJson: any): RuleRowUI[] {
     title: r.title ?? "Regra",
     ruleType: r.ruleType ?? "KO",
     weight: r.weight,
+    group: r.group ?? "",
+    collapsed: Boolean(r.collapsed ?? false),
     message: r.message,
     when: attachIds(r.when ?? { type: "group", op: "AND", children: [] }),
   }))
@@ -96,6 +100,8 @@ export function toTreeJsonFromRules(rules: RuleRowUI[]) {
       ruleType: r.ruleType,
       weight: r.ruleType === "SCORE" ? Number(r.weight ?? 0) : undefined,
       message: r.message ?? undefined,
+      group: r.group ? r.group : undefined,
+      collapsed: r.collapsed ? true : undefined,
       when: stripIds(r.when),
     })),
   }
@@ -144,6 +150,48 @@ function operatorOptions(valueType: FieldOption["valueType"]): Array<{ op: Opera
   return [...common, ...text]
 }
 
+function operatorLabel(op: Operator) {
+  const map: Record<string, string> = {
+    present: "Está presente",
+    absent: "Está ausente",
+    eq: "Igual a",
+    neq: "Diferente de",
+    gt: "Maior que",
+    gte: "Maior ou igual",
+    lt: "Menor que",
+    lte: "Menor ou igual",
+    contains: "Contém",
+    in: "Em (lista)",
+    not_in: "Não em (lista)",
+    between: "Entre",
+  }
+  return map[op] ?? op
+}
+
+function summarizeTree(tree: Tree, catalog: FieldOption[]): string {
+  const findFirstCondition = (t: Tree): Extract<Tree, { type: "condition" }> | null => {
+    if (t.type === "condition") return t
+    if (t.type === "group") {
+      for (const ch of t.children) {
+        const found = findFirstCondition(ch)
+        if (found) return found
+      }
+    }
+    return null
+  }
+  const c = findFirstCondition(tree)
+  if (!c) return "Sem condições"
+  const f = catalog.find((x) => x.field === c.field && x.key === (c.key ?? ""))?.label ?? `${c.field}.${c.key ?? ""}`
+  const op = operatorLabel(c.operator)
+  const v =
+    c.operator === "present" || c.operator === "absent"
+      ? ""
+      : Array.isArray(c.value)
+        ? JSON.stringify(c.value)
+        : String(c.value ?? "")
+  return `${f} ${op}${v ? ` ${v}` : ""}`
+}
+
 export function RuleBuilder({
   value,
   onChange,
@@ -152,6 +200,11 @@ export function RuleBuilder({
   onChange: (next: RuleRowUI[]) => void
 }) {
   const catalog = useMemo(() => fieldCatalog(), [])
+  const groups = useMemo(() => {
+    const g = new Set<string>()
+    for (const r of value) g.add((r.group ?? "").trim() || "Sem grupo")
+    return Array.from(g).sort()
+  }, [value])
 
   const addRule = () => {
     onChange([
@@ -161,35 +214,171 @@ export function RuleBuilder({
         id: `rule_${Math.random().toString(36).slice(2, 8)}`,
         title: "Nova regra",
         ruleType: "KO",
+        group: "",
+        collapsed: false,
         message: "",
         when: { type: "group", _id: uuid(), op: "AND", children: [] },
       },
     ])
   }
 
+  const addTemplate = (tpl: "ko_iso9001" | "ko_deadline_10" | "review_low_conf" | "score_iso27001") => {
+    const base: RuleRowUI = {
+      _id: uuid(),
+      id: `rule_${Math.random().toString(36).slice(2, 8)}`,
+      title: "Regra",
+      ruleType: "KO",
+      group: "Elegibilidade",
+      collapsed: false,
+      message: "",
+      when: { type: "group", _id: uuid(), op: "AND", children: [] },
+    }
+
+    if (tpl === "ko_iso9001") {
+      onChange([
+        ...value,
+        {
+          ...base,
+          id: "ko_iso_9001",
+          title: "ISO 9001 obrigatória",
+          ruleType: "KO",
+          message: "Exige ISO 9001 vigente.",
+          when: {
+            type: "group",
+            _id: uuid(),
+            op: "AND",
+            children: [{ type: "condition", _id: uuid(), field: "capability", key: "certificacao.iso_9001", operator: "eq", value: true }],
+          },
+        },
+      ])
+      return
+    }
+    if (tpl === "ko_deadline_10") {
+      onChange([
+        ...value,
+        {
+          ...base,
+          id: "ko_prazo_minimo_10dias",
+          title: "Prazo mínimo (10 dias)",
+          ruleType: "KO",
+          group: "Operacional",
+          message: "Edital com prazo muito curto.",
+          when: {
+            type: "group",
+            _id: uuid(),
+            op: "AND",
+            children: [{ type: "condition", _id: uuid(), field: "edital", key: "deadline_at", operator: "gte", value: 10 }],
+          },
+        },
+      ])
+      return
+    }
+    if (tpl === "review_low_conf") {
+      onChange([
+        ...value,
+        {
+          ...base,
+          id: "info_conf_min",
+          title: "Confiança mínima da extração",
+          ruleType: "INFO",
+          group: "Qualidade",
+          message: "Extração com confiança baixa pode exigir revisão humana.",
+          when: { type: "condition", _id: uuid(), field: "extraction", key: "confidence", operator: "gte", value: 0.35 },
+        },
+      ])
+      return
+    }
+    if (tpl === "score_iso27001") {
+      onChange([
+        ...value,
+        {
+          ...base,
+          id: "score_iso_27001",
+          title: "Bônus ISO 27001",
+          ruleType: "SCORE",
+          weight: 5,
+          group: "Técnico",
+          message: "Bônus por ISO 27001.",
+          when: { type: "condition", _id: uuid(), field: "capability", key: "certificacao.iso_27001", operator: "eq", value: true },
+        },
+      ])
+      return
+    }
+  }
+
+  const setGroupCollapsed = (groupName: string, collapsed: boolean) => {
+    onChange(
+      value.map((r) => {
+        const g = (r.group ?? "").trim() || "Sem grupo"
+        if (g !== groupName) return r
+        return { ...r, collapsed }
+      })
+    )
+  }
+
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <div className="text-sm font-medium">Regras</div>
-        <button
-          type="button"
-          onClick={addRule}
-          className="rounded-md border border-border bg-background px-3 py-1.5 text-xs hover:border-foreground/20"
-        >
-          + Adicionar regra
-        </button>
+        <div className="flex items-center gap-2">
+          <select
+            className="rounded-md border border-border bg-background px-3 py-1.5 text-xs"
+            defaultValue=""
+            onChange={(e) => {
+              const v = e.target.value as any
+              if (!v) return
+              addTemplate(v)
+              e.currentTarget.value = ""
+            }}
+            title="Adicionar template"
+          >
+            <option value="">+ Template</option>
+            <option value="ko_iso9001">KO: ISO 9001</option>
+            <option value="ko_deadline_10">KO: Prazo ≥ 10 dias</option>
+            <option value="score_iso27001">Score: ISO 27001 (+5)</option>
+            <option value="review_low_conf">Info: Confiança ≥ 0.35</option>
+          </select>
+          <button
+            type="button"
+            onClick={addRule}
+            className="rounded-md border border-border bg-background px-3 py-1.5 text-xs hover:border-foreground/20"
+          >
+            + Adicionar regra
+          </button>
+        </div>
       </div>
 
       <div className="space-y-3">
-        {value.map((r) => (
-          <RuleCard
-            key={r._id}
-            rule={r}
-            catalog={catalog}
-            onChange={(next) => onChange(value.map((x) => (x._id === r._id ? next : x)))}
-            onDelete={() => onChange(value.filter((x) => x._id !== r._id))}
-          />
-        ))}
+        {groups.map((gname) => {
+          const items = value.filter((r) => ((r.group ?? "").trim() || "Sem grupo") === gname)
+          const allCollapsed = items.length ? items.every((r) => r.collapsed) : false
+          return (
+            <div key={gname} className="rounded-lg border border-border bg-background">
+              <div className="flex items-center justify-between p-3 border-b border-border">
+                <div className="text-sm font-medium">{gname}</div>
+                <button
+                  type="button"
+                  onClick={() => setGroupCollapsed(gname, !allCollapsed)}
+                  className="rounded-md border border-border bg-surface px-3 py-1.5 text-xs hover:border-foreground/20"
+                >
+                  {allCollapsed ? "Expandir tudo" : "Recolher tudo"}
+                </button>
+              </div>
+              <div className="p-3 space-y-3">
+                {items.map((r) => (
+                  <RuleCard
+                    key={r._id}
+                    rule={r}
+                    catalog={catalog}
+                    onChange={(next) => onChange(value.map((x) => (x._id === r._id ? next : x)))}
+                    onDelete={() => onChange(value.filter((x) => x._id !== r._id))}
+                  />
+                ))}
+                {!items.length ? <div className="text-xs text-muted">Sem regras neste grupo.</div> : null}
+              </div>
+            </div>
+          )
+        })}
         {!value.length ? <div className="text-xs text-muted">Nenhuma regra ainda.</div> : null}
       </div>
     </div>
@@ -207,6 +396,7 @@ function RuleCard({
   onChange: (r: RuleRowUI) => void
   onDelete: () => void
 }) {
+  const collapsed = Boolean(rule.collapsed)
   return (
     <div className="rounded-lg border border-border bg-surface p-4 space-y-3">
       <div className="flex items-start justify-between gap-3">
@@ -227,6 +417,25 @@ function RuleCard({
               <option value="SCORE">Pontuável</option>
               <option value="INFO">Informativa</option>
             </select>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+            <input
+              value={rule.group ?? ""}
+              onChange={(e) => onChange({ ...rule, group: e.target.value })}
+              className="rounded-md border border-border bg-background px-3 py-2 text-sm"
+              placeholder="Grupo (ex.: Elegibilidade / Financeiro / Técnico)"
+            />
+            <button
+              type="button"
+              onClick={() => onChange({ ...rule, collapsed: !collapsed })}
+              className="rounded-md border border-border bg-background px-3 py-2 text-sm hover:border-foreground/20"
+            >
+              {collapsed ? "Expandir" : "Recolher"}
+            </button>
+            <div className="text-xs text-muted flex items-center">
+              {rule.id}
+            </div>
           </div>
 
           {rule.ruleType === "SCORE" ? (
@@ -272,14 +481,18 @@ function RuleCard({
         </button>
       </div>
 
-      <div className="rounded-md border border-border bg-background p-3">
-        <GroupEditor
-          node={rule.when.type === "group" ? rule.when : { type: "group", _id: uuid(), op: "AND", children: [rule.when] }}
-          catalog={catalog}
-          onChange={(when) => onChange({ ...rule, when })}
-          depth={0}
-        />
-      </div>
+      {!collapsed ? (
+        <div className="rounded-md border border-border bg-background p-3">
+          <GroupEditor
+            node={rule.when.type === "group" ? rule.when : { type: "group", _id: uuid(), op: "AND", children: [rule.when] }}
+            catalog={catalog}
+            onChange={(when) => onChange({ ...rule, when })}
+            depth={0}
+          />
+        </div>
+      ) : (
+        <div className="text-xs text-muted">Resumo: {summarizeTree(rule.when, catalog)}</div>
+      )}
     </div>
   )
 }
@@ -397,6 +610,11 @@ function ConditionEditor({
 }) {
   const selected = catalog.find((c) => c.field === node.field && c.key === (node.key ?? "")) ?? catalog[0]
   const ops = operatorOptions(selected.valueType)
+  const needsValue = !(node.operator === "present" || node.operator === "absent")
+  const invalid =
+    (needsValue && (node.value === undefined || node.value === null || node.value === "")) ||
+    (node.operator === "between" && (!Array.isArray(node.value) || node.value.length !== 2)) ||
+    ((node.operator === "in" || node.operator === "not_in") && !Array.isArray(node.value))
 
   const setField = (val: string) => {
     const [field, key] = val.split("::")
@@ -534,7 +752,8 @@ function ConditionEditor({
       </div>
       <div className="md:col-span-3">
         <div className="text-[11px] text-muted mb-1">Valor</div>
-        {renderValue()}
+        <div className={invalid ? "rounded-md border border-danger/30 p-1" : ""}>{renderValue()}</div>
+        {invalid ? <div className="text-[11px] text-danger mt-1">Complete o valor desta condição.</div> : null}
       </div>
       <div className="md:col-span-1 flex justify-end pt-5">
         <button

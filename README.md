@@ -50,6 +50,7 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 - `app/(auth)/login` — tela de login (Supabase Auth)
 - `lib/supabase/*` — clientes Supabase (browser/server)
 - `middleware.ts` — proteção de rotas + refresh de sessão do Supabase
+- `supabase/team.sql` — schema do módulo Time (skills/tags, avatar, certificados + buckets)
 
 ## Deploy na Vercel (resumo)
 

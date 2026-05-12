@@ -1,13 +1,21 @@
-export default function ParceirosPage() {
-  return (
-    <div className="space-y-2">
-      <h1 className="text-2xl font-semibold" style={{ fontFamily: "var(--font-display)" }}>
-        Parceiros
-      </h1>
-      <p className="text-sm text-muted">
-        Placeholder da lista de parceiros. Próximo passo: filtros + grid de cards.
-      </p>
-    </div>
-  )
-}
+import { PartnersClient } from "@/components/partners/partners-client"
+import { createClient } from "@/lib/supabase/server"
 
+export default async function ParceirosPage() {
+  const supabase = createClient()
+
+  const [{ data: partners }, { data: roles }] = await Promise.all([
+    supabase
+      .from("partners")
+      .select("*, focals:partner_focal_points(*)")
+      .order("name", { ascending: true }),
+    supabase.from("partner_contact_roles").select("*").order("name", { ascending: true }),
+  ])
+
+  const normalized = (partners ?? []).map((p: any) => ({
+    ...p,
+    tags: Array.isArray(p.tags) ? p.tags : [],
+  }))
+
+  return <PartnersClient initialPartners={normalized} initialRoles={roles ?? []} />
+}

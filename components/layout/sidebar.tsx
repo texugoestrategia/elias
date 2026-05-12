@@ -1,14 +1,53 @@
 import Link from "next/link"
+import { createClient } from "@/lib/supabase/server"
 
-const navItems = [
+const defaultNavItems = [
   { href: "/", label: "Dashboard" },
   { href: "/parceiros", label: "Parceiros" },
   { href: "/time", label: "Time" },
   { href: "/processos", label: "Processos" },
   { href: "/editais", label: "Editais" },
+  { href: "/configuracoes/aparencia", label: "Aparência" },
+  { href: "/configuracoes/layout", label: "Layout" },
 ]
 
-export function Sidebar() {
+function applySidebarLayout(
+  items: typeof defaultNavItems,
+  layout: any | null
+): typeof defaultNavItems {
+  const order: string[] = Array.isArray(layout?.order) ? layout.order : []
+  const hidden: string[] = Array.isArray(layout?.hidden) ? layout.hidden : []
+
+  const byHref = new Map(items.map((i) => [i.href, i]))
+  const out: typeof defaultNavItems = []
+
+  for (const href of order) {
+    const it = byHref.get(href)
+    if (!it) continue
+    if (hidden.includes(href)) continue
+    out.push(it)
+    byHref.delete(href)
+  }
+
+  for (const it of byHref.values()) {
+    if (hidden.includes(it.href)) continue
+    out.push(it)
+  }
+
+  return out
+}
+
+export async function Sidebar() {
+  const supabase = createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  const { data: layoutRow } = user
+    ? await supabase.from("user_layouts").select("value").eq("user_id", user.id).eq("key", "sidebar").maybeSingle()
+    : { data: null as any }
+
+  const navItems = applySidebarLayout(defaultNavItems, layoutRow?.value ?? null)
   return (
     <aside className="w-64 shrink-0 border-r border-border bg-surface">
       <div className="px-4 py-4 border-b border-border">
@@ -34,4 +73,3 @@ export function Sidebar() {
     </aside>
   )
 }
-

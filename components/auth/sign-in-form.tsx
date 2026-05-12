@@ -42,7 +42,9 @@ export function SignInForm() {
       const redirectTo = `${window.location.origin}/account/update-password`
       const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo })
       if (error) throw error
-      setMessage("Se esse email existir, enviaremos um link de recuperação. Verifique sua caixa de entrada.")
+      setMessage(
+        "Email enviado (se existir na base). Por favor, verifique sua caixa de entrada e a pasta de spam."
+      )
     } catch (e: any) {
       setError(e?.message ?? "Falha ao enviar link de recuperação")
     } finally {

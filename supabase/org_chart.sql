@@ -51,13 +51,22 @@ begin
       to authenticated
       using (true);
   end if;
-  if not exists (select 1 from pg_policies where schemaname='public' and tablename='org_positions' and policyname='org_positions_write') then
+
+  drop policy if exists "org_positions_write" on public.org_positions;
+  if has_perm then
     create policy "org_positions_write"
       on public.org_positions
       for all
       to authenticated
-      using (case when has_perm then public.has_permission('time.manage') else true end)
-      with check (case when has_perm then public.has_permission('time.manage') else true end);
+      using (public.has_permission('time.manage'))
+      with check (public.has_permission('time.manage'));
+  else
+    create policy "org_positions_write"
+      on public.org_positions
+      for all
+      to authenticated
+      using (true)
+      with check (true);
   end if;
 
   if not exists (select 1 from pg_policies where schemaname='public' and tablename='org_members' and policyname='org_members_select_authenticated') then
@@ -67,13 +76,22 @@ begin
       to authenticated
       using (true);
   end if;
-  if not exists (select 1 from pg_policies where schemaname='public' and tablename='org_members' and policyname='org_members_write') then
+
+  drop policy if exists "org_members_write" on public.org_members;
+  if has_perm then
     create policy "org_members_write"
       on public.org_members
       for all
       to authenticated
-      using (case when has_perm then public.has_permission('time.manage') else true end)
-      with check (case when has_perm then public.has_permission('time.manage') else true end);
+      using (public.has_permission('time.manage'))
+      with check (public.has_permission('time.manage'));
+  else
+    create policy "org_members_write"
+      on public.org_members
+      for all
+      to authenticated
+      using (true)
+      with check (true);
   end if;
 end $$;
 
@@ -101,4 +119,3 @@ begin
 
   return uid;
 end $$;
-

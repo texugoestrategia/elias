@@ -71,15 +71,6 @@ begin
       to authenticated
       using (true);
   end if;
-  if not exists (select 1 from pg_policies where schemaname='public' and tablename='partner_catalog_nodes' and policyname='partner_catalog_nodes_write') then
-    create policy "partner_catalog_nodes_write"
-      on public.partner_catalog_nodes
-      for all
-      to authenticated
-      using (case when has_perm then public.has_permission('catalog.manage') else true end)
-      with check (case when has_perm then public.has_permission('catalog.manage') else true end);
-  end if;
-
   if not exists (select 1 from pg_policies where schemaname='public' and tablename='partner_catalog_items' and policyname='partner_catalog_items_select') then
     create policy "partner_catalog_items_select"
       on public.partner_catalog_items
@@ -87,15 +78,6 @@ begin
       to authenticated
       using (true);
   end if;
-  if not exists (select 1 from pg_policies where schemaname='public' and tablename='partner_catalog_items' and policyname='partner_catalog_items_write') then
-    create policy "partner_catalog_items_write"
-      on public.partner_catalog_items
-      for all
-      to authenticated
-      using (case when has_perm then public.has_permission('catalog.manage') else true end)
-      with check (case when has_perm then public.has_permission('catalog.manage') else true end);
-  end if;
-
   if not exists (select 1 from pg_policies where schemaname='public' and tablename='partner_catalog_item_articles' and policyname='partner_catalog_item_articles_select') then
     create policy "partner_catalog_item_articles_select"
       on public.partner_catalog_item_articles
@@ -103,13 +85,53 @@ begin
       to authenticated
       using (true);
   end if;
-  if not exists (select 1 from pg_policies where schemaname='public' and tablename='partner_catalog_item_articles' and policyname='partner_catalog_item_articles_write') then
+
+  drop policy if exists "partner_catalog_nodes_write" on public.partner_catalog_nodes;
+  drop policy if exists "partner_catalog_items_write" on public.partner_catalog_items;
+  drop policy if exists "partner_catalog_item_articles_write" on public.partner_catalog_item_articles;
+
+  if has_perm then
+    create policy "partner_catalog_nodes_write"
+      on public.partner_catalog_nodes
+      for all
+      to authenticated
+      using (public.has_permission('catalog.manage'))
+      with check (public.has_permission('catalog.manage'));
+
+    create policy "partner_catalog_items_write"
+      on public.partner_catalog_items
+      for all
+      to authenticated
+      using (public.has_permission('catalog.manage'))
+      with check (public.has_permission('catalog.manage'));
+
     create policy "partner_catalog_item_articles_write"
       on public.partner_catalog_item_articles
       for all
       to authenticated
-      using (case when has_perm then public.has_permission('catalog.manage') else true end)
-      with check (case when has_perm then public.has_permission('catalog.manage') else true end);
+      using (public.has_permission('catalog.manage'))
+      with check (public.has_permission('catalog.manage'));
+  else
+    create policy "partner_catalog_nodes_write"
+      on public.partner_catalog_nodes
+      for all
+      to authenticated
+      using (true)
+      with check (true);
+
+    create policy "partner_catalog_items_write"
+      on public.partner_catalog_items
+      for all
+      to authenticated
+      using (true)
+      with check (true);
+
+    create policy "partner_catalog_item_articles_write"
+      on public.partner_catalog_item_articles
+      for all
+      to authenticated
+      using (true)
+      with check (true);
   end if;
 end $$;
 

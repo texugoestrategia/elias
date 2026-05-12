@@ -104,72 +104,42 @@ declare
 begin
   select exists(select 1 from pg_proc where proname = 'has_permission') into has_perm;
 
-  -- process_areas
+  drop policy if exists "process_areas_write" on public.process_areas;
+  drop policy if exists "processes_write" on public.processes;
+  drop policy if exists "process_files_write" on public.process_files;
+  drop policy if exists "process_kpis_write" on public.process_kpis;
+  drop policy if exists "process_kpi_values_write" on public.process_kpi_values;
+
   if not exists (select 1 from pg_policies where schemaname='public' and tablename='process_areas' and policyname='process_areas_select') then
     create policy "process_areas_select"
       on public.process_areas
       for select
       to authenticated
-      using (case when has_perm then public.has_permission('process.view') or public.has_permission('process.manage') else true end);
-  end if;
-  if not exists (select 1 from pg_policies where schemaname='public' and tablename='process_areas' and policyname='process_areas_write') then
-    create policy "process_areas_write"
-      on public.process_areas
-      for all
-      to authenticated
-      using (case when has_perm then public.has_permission('process.manage') else true end)
-      with check (case when has_perm then public.has_permission('process.manage') else true end);
+      using (true);
   end if;
 
-  -- processes
   if not exists (select 1 from pg_policies where schemaname='public' and tablename='processes' and policyname='processes_select') then
     create policy "processes_select"
       on public.processes
       for select
       to authenticated
-      using (case when has_perm then public.has_permission('process.view') or public.has_permission('process.manage') else true end);
-  end if;
-  if not exists (select 1 from pg_policies where schemaname='public' and tablename='processes' and policyname='processes_write') then
-    create policy "processes_write"
-      on public.processes
-      for all
-      to authenticated
-      using (case when has_perm then public.has_permission('process.manage') else true end)
-      with check (case when has_perm then public.has_permission('process.manage') else true end);
+      using (true);
   end if;
 
-  -- process_files
   if not exists (select 1 from pg_policies where schemaname='public' and tablename='process_files' and policyname='process_files_select') then
     create policy "process_files_select"
       on public.process_files
       for select
       to authenticated
-      using (case when has_perm then public.has_permission('process.view') or public.has_permission('process.manage') else true end);
-  end if;
-  if not exists (select 1 from pg_policies where schemaname='public' and tablename='process_files' and policyname='process_files_write') then
-    create policy "process_files_write"
-      on public.process_files
-      for all
-      to authenticated
-      using (case when has_perm then public.has_permission('process.manage') else true end)
-      with check (case when has_perm then public.has_permission('process.manage') else true end);
+      using (true);
   end if;
 
-  -- process_kpis + values
   if not exists (select 1 from pg_policies where schemaname='public' and tablename='process_kpis' and policyname='process_kpis_select') then
     create policy "process_kpis_select"
       on public.process_kpis
       for select
       to authenticated
-      using (case when has_perm then public.has_permission('process.view') or public.has_permission('process.manage') else true end);
-  end if;
-  if not exists (select 1 from pg_policies where schemaname='public' and tablename='process_kpis' and policyname='process_kpis_write') then
-    create policy "process_kpis_write"
-      on public.process_kpis
-      for all
-      to authenticated
-      using (case when has_perm then public.has_permission('process.manage') else true end)
-      with check (case when has_perm then public.has_permission('process.manage') else true end);
+      using (true);
   end if;
 
   if not exists (select 1 from pg_policies where schemaname='public' and tablename='process_kpi_values' and policyname='process_kpi_values_select') then
@@ -177,15 +147,79 @@ begin
       on public.process_kpi_values
       for select
       to authenticated
-      using (case when has_perm then public.has_permission('process.view') or public.has_permission('process.manage') else true end);
+      using (true);
   end if;
-  if not exists (select 1 from pg_policies where schemaname='public' and tablename='process_kpi_values' and policyname='process_kpi_values_write') then
+
+  if has_perm then
+    create policy "process_areas_write"
+      on public.process_areas
+      for all
+      to authenticated
+      using (public.has_permission('process.manage'))
+      with check (public.has_permission('process.manage'));
+
+    create policy "processes_write"
+      on public.processes
+      for all
+      to authenticated
+      using (public.has_permission('process.manage'))
+      with check (public.has_permission('process.manage'));
+
+    create policy "process_files_write"
+      on public.process_files
+      for all
+      to authenticated
+      using (public.has_permission('process.manage'))
+      with check (public.has_permission('process.manage'));
+
+    create policy "process_kpis_write"
+      on public.process_kpis
+      for all
+      to authenticated
+      using (public.has_permission('process.manage'))
+      with check (public.has_permission('process.manage'));
+
     create policy "process_kpi_values_write"
       on public.process_kpi_values
       for all
       to authenticated
-      using (case when has_perm then public.has_permission('process.manage') else true end)
-      with check (case when has_perm then public.has_permission('process.manage') else true end);
+      using (public.has_permission('process.manage'))
+      with check (public.has_permission('process.manage'));
+  else
+    create policy "process_areas_write"
+      on public.process_areas
+      for all
+      to authenticated
+      using (true)
+      with check (true);
+
+    create policy "processes_write"
+      on public.processes
+      for all
+      to authenticated
+      using (true)
+      with check (true);
+
+    create policy "process_files_write"
+      on public.process_files
+      for all
+      to authenticated
+      using (true)
+      with check (true);
+
+    create policy "process_kpis_write"
+      on public.process_kpis
+      for all
+      to authenticated
+      using (true)
+      with check (true);
+
+    create policy "process_kpi_values_write"
+      on public.process_kpi_values
+      for all
+      to authenticated
+      using (true)
+      with check (true);
   end if;
 end $$;
 

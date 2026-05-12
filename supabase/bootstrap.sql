@@ -23,6 +23,17 @@ end;
 $$;
 
 -- =========================================
+-- Stub temporário: has_permission (para permitir criar policies antes do RBAC completo)
+-- Ele será sobrescrito mais abaixo pelo RBAC por permissões.
+-- =========================================
+create or replace function public.has_permission(permission_key text)
+returns boolean
+language sql stable
+as $$
+  select true;
+$$;
+
+-- =========================================
 -- TIME (MVP+)
 -- =========================================
 create table if not exists public.team_members (
@@ -388,7 +399,7 @@ declare
   p_id uuid;
   root_id uuid;
   sub_id uuid;
-  item_id uuid;
+  v_item_id uuid;
 begin
   select id into p_id from public.partners where name='Parceiro Demo' limit 1;
   if p_id is null then return; end if;
@@ -407,16 +418,20 @@ begin
     returning id into sub_id;
   end if;
 
-  select id into item_id from public.partner_catalog_items where partner_id=p_id and node_id=sub_id and name='Análise de Contratos (Demo)' limit 1;
-  if item_id is null then
+  select id into v_item_id from public.partner_catalog_items where partner_id=p_id and node_id=sub_id and name='Análise de Contratos (Demo)' limit 1;
+  if v_item_id is null then
     insert into public.partner_catalog_items (partner_id, node_id, kind, name, description, tags)
     values (p_id, sub_id, 'service', 'Análise de Contratos (Demo)', 'Revisão e parecer de contratos', array['jurídico','compliance'])
-    returning id into item_id;
+    returning id into v_item_id;
   end if;
 
-  if not exists (select 1 from public.partner_catalog_item_articles where item_id=item_id and title='Como acionar (Demo)') then
+  if not exists (
+    select 1
+    from public.partner_catalog_item_articles a
+    where a.item_id = v_item_id and a.title='Como acionar (Demo)'
+  ) then
     insert into public.partner_catalog_item_articles (item_id, title, content)
-    values (item_id, 'Como acionar (Demo)', 'Passo a passo:\n1) Enviar contrato\n2) Informar prazo\n3) Receber parecer\n\nObservação: artigo interno de exemplo.');
+    values (v_item_id, 'Como acionar (Demo)', 'Passo a passo:\n1) Enviar contrato\n2) Informar prazo\n3) Receber parecer\n\nObservação: artigo interno de exemplo.');
   end if;
 end $$;
 
@@ -546,7 +561,7 @@ declare
   ops_id uuid;
   root_id uuid;
   sub_id uuid;
-  kpi_id uuid;
+  v_kpi_id uuid;
 begin
   select id into ops_id from public.process_areas where name='Operações' limit 1;
 
@@ -564,17 +579,17 @@ begin
     returning id into sub_id;
   end if;
 
-  select id into kpi_id from public.process_kpis where process_id=sub_id and name='SLA (dias)' limit 1;
-  if kpi_id is null then
+  select id into v_kpi_id from public.process_kpis where process_id=sub_id and name='SLA (dias)' limit 1;
+  if v_kpi_id is null then
     insert into public.process_kpis (process_id, name, unit, direction, target, warning_threshold, critical_threshold)
     values (sub_id, 'SLA (dias)', 'dias', 'lower_is_better', 5, 7, 10)
-    returning id into kpi_id;
+    returning id into v_kpi_id;
   end if;
 
   insert into public.process_kpi_values (kpi_id, date, value)
-  values (kpi_id, current_date - 14, 8),
-         (kpi_id, current_date - 7, 6),
-         (kpi_id, current_date, 4)
+  values (v_kpi_id, current_date - 14, 8),
+         (v_kpi_id, current_date - 7, 6),
+         (v_kpi_id, current_date, 4)
   on conflict (kpi_id, date) do nothing;
 end $$;
 

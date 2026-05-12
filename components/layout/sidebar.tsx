@@ -1,5 +1,6 @@
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/server"
+import { AppLogo } from "@/components/layout/logo"
 
 const defaultNavItems = [
   { href: "/", label: "Dashboard" },
@@ -54,15 +55,7 @@ export async function Sidebar() {
       <div className="px-4 py-4 border-b border-border">
         <div className="flex items-center gap-3">
           {/* Se existir em public/img/logo.png, ele aparece aqui. */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/img/logo.png"
-            alt="Mimir"
-            className="h-8 w-8 rounded-md border border-border bg-background object-contain"
-            onError={(e) => {
-              ;(e.currentTarget as HTMLImageElement).style.display = "none"
-            }}
-          />
+          <AppLogo size={32} />
           <div>
             <div className="text-lg font-semibold" style={{ fontFamily: "var(--font-display)" }}>
               Mimir

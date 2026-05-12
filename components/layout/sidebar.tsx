@@ -60,7 +60,7 @@ export async function Sidebar() {
             <div className="text-lg font-semibold" style={{ fontFamily: "var(--font-display)" }}>
               Mimir
             </div>
-            <div className="text-xs text-muted">Segurança & Privacidade</div>
+            <div className="text-xs text-muted">Fonte da Sabedoria</div>
           </div>
         </div>
       </div>

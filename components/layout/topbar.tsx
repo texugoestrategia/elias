@@ -12,22 +12,42 @@ export function Topbar() {
 
   useEffect(() => {
     const supabase = createClient()
-    supabase.auth.getUser().then(({ data }) => {
+    ;(async () => {
+      const { data } = await supabase.auth.getUser()
       const u = data.user
+
       const fullName =
         (u?.user_metadata?.full_name as string | undefined) ||
         (u?.user_metadata?.name as string | undefined) ||
         (u?.user_metadata?.display_name as string | undefined) ||
         null
+
       const pic =
         (u?.user_metadata?.avatar_url as string | undefined) ||
         (u?.user_metadata?.picture as string | undefined) ||
         null
 
-      setName(fullName || (u?.email ?? null))
-      setEmail(u?.email ?? null)
-      setAvatarUrl(pic)
-    })
+      const userEmail = u?.email ?? null
+      setEmail(userEmail)
+
+      // Fallback: se o Auth não estiver fornecendo name/picture, tenta ler do Time (team_members)
+      if (userEmail) {
+        const { data: tm } = await supabase
+          .from("team_members")
+          .select("name,avatar_url")
+          .eq("email", userEmail)
+          .maybeSingle()
+
+        const finalName = fullName || tm?.name || userEmail
+        const finalPic = pic || tm?.avatar_url || null
+
+        setName(finalName)
+        setAvatarUrl(finalPic)
+      } else {
+        setName(fullName)
+        setAvatarUrl(pic)
+      }
+    })()
   }, [])
 
   const onSignOut = async () => {

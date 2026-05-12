@@ -23,11 +23,15 @@ export default async function RootLayout({
 }>) {
   const prefs = await getUserPreferences();
   const cssVars = toCssVars(prefs);
+  const themeMode = prefs.theme_mode ?? "dark";
+  const resolvedTheme = themeMode === "light" ? "light" : "dark";
   return (
     <html
       lang="pt-BR"
       className={`${dmSans.variable} ${dmSerif.variable} h-full antialiased`}
       style={cssVars}
+      data-theme-mode={themeMode}
+      data-theme={resolvedTheme}
     >
       <body className={`min-h-full flex flex-col ${prefs.dense_mode ? "dense" : ""}`}>{children}</body>
     </html>

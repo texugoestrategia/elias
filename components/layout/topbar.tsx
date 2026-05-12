@@ -7,11 +7,26 @@ import { createClient } from "@/lib/supabase/client"
 export function Topbar() {
   const router = useRouter()
   const [name, setName] = useState<string | null>(null)
+  const [email, setEmail] = useState<string | null>(null)
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
 
   useEffect(() => {
     const supabase = createClient()
     supabase.auth.getUser().then(({ data }) => {
-      setName(data.user?.email ?? null)
+      const u = data.user
+      const fullName =
+        (u?.user_metadata?.full_name as string | undefined) ||
+        (u?.user_metadata?.name as string | undefined) ||
+        (u?.user_metadata?.display_name as string | undefined) ||
+        null
+      const pic =
+        (u?.user_metadata?.avatar_url as string | undefined) ||
+        (u?.user_metadata?.picture as string | undefined) ||
+        null
+
+      setName(fullName || (u?.email ?? null))
+      setEmail(u?.email ?? null)
+      setAvatarUrl(pic)
     })
   }, [])
 
@@ -26,7 +41,20 @@ export function Topbar() {
     <header className="h-14 border-b border-border bg-surface px-4 flex items-center justify-between">
       <div className="text-sm text-muted">Plataforma interna</div>
       <div className="flex items-center gap-3">
-        <div className="text-sm">Olá{name ? `, ${name}` : ""}</div>
+        <div className="flex items-center gap-3">
+          <div className="h-8 w-8 rounded-full border border-border bg-background overflow-hidden flex items-center justify-center text-xs text-muted">
+            {avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
+            ) : (
+              <span>{(name ?? email ?? "?").slice(0, 1).toUpperCase()}</span>
+            )}
+          </div>
+          <div className="leading-tight">
+            <div className="text-sm">Olá{name ? `, ${name}` : ""}</div>
+            {email && name !== email ? <div className="text-[11px] text-muted">{email}</div> : null}
+          </div>
+        </div>
         <button
           type="button"
           onClick={onSignOut}

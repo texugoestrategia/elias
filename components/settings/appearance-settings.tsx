@@ -4,6 +4,7 @@ import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { CollapsibleSection } from "@/components/ui/collapsible-section"
+import { safeStorageFileName } from "@/lib/files/safe-name"
 import {
   ACCENTS,
   BACKGROUNDS,
@@ -110,7 +111,8 @@ export function AppearanceSettings({ initial }: { initial: UserPreferences }) {
       const user = authData.user
       if (!user) throw new Error("Não autenticado")
 
-      const path = `user/${user.id}/${Date.now()}-${file.name}`
+      const safeName = safeStorageFileName(file.name)
+      const path = `user/${user.id}/${Date.now()}-${safeName}`
       const { error: upErr } = await supabase.storage.from("backgrounds").upload(path, file, {
         upsert: true,
       })

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
+import { safeStorageFileName } from "@/lib/files/safe-name"
 import { TagInput } from "@/components/time/tag-input"
 
 type Partner = {
@@ -245,7 +246,7 @@ export function PartnersClient({
     setError(null)
     setLoading(true)
     try {
-      const path = `partner/${partnerId}/logo/${Date.now()}-${file.name}`
+      const path = `partner/${partnerId}/logo/${Date.now()}-${safeStorageFileName(file.name)}`
       const { error: upErr } = await supabase.storage.from("partner-assets").upload(path, file, { upsert: true })
       if (upErr) throw upErr
       const { data } = supabase.storage.from("partner-assets").getPublicUrl(path)
@@ -1364,7 +1365,7 @@ function PartnerMaterials({ partnerId }: { partnerId: string }) {
     setLoading(true)
     try {
       if (!title.trim()) throw new Error("Informe o título.")
-      const path = `partner/${partnerId}/materials/${Date.now()}-${file.name}`
+      const path = `partner/${partnerId}/materials/${Date.now()}-${safeStorageFileName(file.name)}`
       const { error: upErr } = await supabase.storage.from("partner-assets").upload(path, file, { upsert: true })
       if (upErr) throw upErr
       const { data } = supabase.storage.from("partner-assets").getPublicUrl(path)

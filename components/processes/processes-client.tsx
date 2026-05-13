@@ -73,14 +73,16 @@ type KPIValue = {
 export function ProcessesClient({
   initialAreas,
   initialProcesses,
+  initialSelectedId,
 }: {
   initialAreas: ProcessArea[]
   initialProcesses: Process[]
+  initialSelectedId?: string | null
 }) {
   const supabase = useMemo(() => createClient(), [])
   const [areas, setAreas] = useState(initialAreas)
   const [processes, setProcesses] = useState(initialProcesses)
-  const [selectedId, setSelectedId] = useState<string | null>(initialProcesses[0]?.id ?? null)
+  const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId ?? initialProcesses[0]?.id ?? null)
 
   const [q, setQ] = useState("")
   const [loading, setLoading] = useState(false)

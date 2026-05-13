@@ -78,7 +78,7 @@ export default async function DashboardPage() {
     { label: "Parceiros", value: partnersCount.count ?? 0, href: "/parceiros" },
     { label: "Processos", value: processesCount.count ?? 0, href: "/processos" },
     { label: "Time", value: teamCount.count ?? 0, href: "/time" },
-    { label: "Relatórios", value: "Mensal", href: "/relatorios/parceiros" },
+    { label: "Relatórios", value: "Mensal", href: "/relatorios" },
   ]
   return (
     <div className="space-y-6">
@@ -184,8 +184,8 @@ export default async function DashboardPage() {
             <Link className="block rounded-md border border-border bg-background px-3 py-2 text-sm hover:border-foreground/20" href="/time">
               Organograma + RBAC
             </Link>
-            <Link className="block rounded-md border border-border bg-background px-3 py-2 text-sm hover:border-foreground/20" href="/configuracoes/aparencia">
-              Ajustar aparência
+            <Link className="block rounded-md border border-border bg-background px-3 py-2 text-sm hover:border-foreground/20" href="/configuracoes">
+              Configurações
             </Link>
           </div>
           <div className="text-xs text-muted">

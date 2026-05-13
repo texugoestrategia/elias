@@ -5,6 +5,7 @@ import { DndContext, closestCenter, type DragEndEvent } from "@dnd-kit/core"
 import { SortableContext, arrayMove, verticalListSortingStrategy } from "@dnd-kit/sortable"
 import { createClient } from "@/lib/supabase/client"
 import { SortableRow, type SortableItem } from "@/components/settings/sortable-list"
+import { CollapsibleSection } from "@/components/ui/collapsible-section"
 
 type LayoutValue = { order: string[]; hidden: string[] }
 
@@ -47,12 +48,15 @@ export function LayoutSettings({
       if (authErr) throw authErr
       if (!authData.user) throw new Error("Não autenticado")
 
-      const { error } = await supabase.from("user_layouts").upsert({
-        user_id: authData.user.id,
-        key,
-        value,
-        updated_at: new Date().toISOString(),
-      })
+      const { error } = await supabase.from("user_layouts").upsert(
+        {
+          user_id: authData.user.id,
+          key,
+          value,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "user_id,key" }
+      )
       if (error) throw error
       setMsg("Layout salvo.")
     } catch (e: any) {
@@ -135,18 +139,22 @@ export function LayoutSettings({
         <div className="rounded-md border border-border bg-surface p-3 text-sm text-muted">{msg}</div>
       ) : null}
 
-      <button
-        type="button"
-        onClick={reset}
-        disabled={saving}
-        className="rounded-md border border-border bg-background px-3 py-2 text-xs hover:border-foreground/20 disabled:opacity-60"
-      >
-        Resetar layout
-      </button>
+      <details className="rounded-lg border border-border bg-surface p-4">
+        <summary className="cursor-pointer text-sm font-medium">Mais ações</summary>
+        <div className="mt-3">
+          <button
+            type="button"
+            onClick={reset}
+            disabled={saving}
+            className="rounded-md border border-border bg-background px-3 py-2 text-xs hover:border-foreground/20 disabled:opacity-60"
+          >
+            Resetar layout
+          </button>
+        </div>
+      </details>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <section className="rounded-lg border border-border bg-surface p-4 space-y-3">
-          <div className="text-sm font-medium">Sidebar</div>
+        <CollapsibleSection title="Sidebar" description="Reordene e oculte entradas. Arraste pelo “⋮⋮”." defaultOpen>
           <DndContext collisionDetection={closestCenter} onDragEnd={onDragEnd("sidebar")}>
             <SortableContext items={sidebar.order} strategy={verticalListSortingStrategy}>
               <div className="space-y-2">
@@ -161,10 +169,9 @@ export function LayoutSettings({
               </div>
             </SortableContext>
           </DndContext>
-        </section>
+        </CollapsibleSection>
 
-        <section className="rounded-lg border border-border bg-surface p-4 space-y-3">
-          <div className="text-sm font-medium">Dashboard (atalhos)</div>
+        <CollapsibleSection title="Dashboard (atalhos)" description="Atalhos do dashboard inicial." defaultOpen={false}>
           <DndContext collisionDetection={closestCenter} onDragEnd={onDragEnd("dashboard")}>
             <SortableContext items={dash.order} strategy={verticalListSortingStrategy}>
               <div className="space-y-2">
@@ -179,9 +186,8 @@ export function LayoutSettings({
               </div>
             </SortableContext>
           </DndContext>
-        </section>
+        </CollapsibleSection>
       </div>
     </div>
   )
 }
-

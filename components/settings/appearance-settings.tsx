@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
+import { CollapsibleSection } from "@/components/ui/collapsible-section"
 import {
   ACCENTS,
   BACKGROUNDS,
@@ -147,8 +148,7 @@ export function AppearanceSettings({ initial }: { initial: UserPreferences }) {
         <div className="rounded-md border border-border bg-surface p-3 text-sm text-muted">{msg}</div>
       ) : null}
 
-      <section className="rounded-lg border border-border bg-surface p-4 space-y-3">
-        <div className="text-sm font-medium">Tema</div>
+      <CollapsibleSection title="Tema" description="Escuro, claro ou sistema." defaultOpen>
         <select
           value={prefs.theme_mode}
           onChange={(e) => {
@@ -166,10 +166,9 @@ export function AppearanceSettings({ initial }: { initial: UserPreferences }) {
         <div className="text-xs text-muted">
           Observação: “Sistema” usa o padrão atual por enquanto (podemos evoluir depois).
         </div>
-      </section>
+      </CollapsibleSection>
 
-      <section className="rounded-lg border border-border bg-surface p-4 space-y-3">
-        <div className="text-sm font-medium">Cor de destaque</div>
+      <CollapsibleSection title="Cor de destaque" description="Escolha uma cor pronta (recomendado) ou HEX (avançado)." defaultOpen={false}>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
           {(Object.keys(ACCENTS) as Exclude<AccentKey, "custom">[]).map((k) => (
             <button
@@ -238,10 +237,9 @@ export function AppearanceSettings({ initial }: { initial: UserPreferences }) {
             </div>
           </div>
         ) : null}
-      </section>
+      </CollapsibleSection>
 
-      <section className="rounded-lg border border-border bg-surface p-4 space-y-3">
-        <div className="text-sm font-medium">Fundo</div>
+      <CollapsibleSection title="Fundo" description="Cor sólida (recomendado) ou imagem." defaultOpen={false}>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
           <button
             type="button"
@@ -375,10 +373,9 @@ export function AppearanceSettings({ initial }: { initial: UserPreferences }) {
             ) : null}
           </div>
         )}
-      </section>
+      </CollapsibleSection>
 
-      <section className="rounded-lg border border-border bg-surface p-4 space-y-3">
-        <div className="text-sm font-medium">Leitura</div>
+      <CollapsibleSection title="Leitura" description="Tamanho de fonte e modo compacto." defaultOpen={false}>
         <label className="block space-y-1">
           <div className="text-xs text-muted">Tamanho da fonte</div>
           <select
@@ -411,7 +408,7 @@ export function AppearanceSettings({ initial }: { initial: UserPreferences }) {
           />
           Modo compacto (tabelas com menos espaçamento)
         </label>
-      </section>
+      </CollapsibleSection>
 
       <div className="flex items-center justify-end gap-2">
         <button

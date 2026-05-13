@@ -152,31 +152,33 @@ export function EditaisBatchesClient({ initialBatches }: { initialBatches: Batch
         <div className="rounded-md border border-border bg-surface p-3 text-sm text-muted">{message}</div>
       ) : null}
 
-      <section className="rounded-lg border border-border bg-surface p-4 space-y-3">
-        <div className="text-sm font-medium">Novo lote</div>
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-          placeholder='Ex.: "Editais Outubro 2026"'
-        />
-        <input
-          type="file"
-          multiple
-          accept="application/pdf,image/*,.xml,.bpmn,.xlsx"
-          onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
-          className="text-xs"
-        />
-        <div className="text-xs text-muted">{files.length ? `${files.length} arquivo(s) selecionado(s)` : "—"}</div>
-        <button
-          type="button"
-          disabled={loading}
-          onClick={createBatch}
-          className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-black disabled:opacity-60"
-        >
-          {loading ? "Criando…" : "Criar lote e enfileirar"}
-        </button>
-      </section>
+      <details className="rounded-lg border border-border bg-surface p-4" open={false}>
+        <summary className="cursor-pointer text-sm font-medium">Novo lote</summary>
+        <div className="mt-3 space-y-3">
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+            placeholder='Ex.: "Editais Outubro 2026"'
+          />
+          <input
+            type="file"
+            multiple
+            accept="application/pdf,image/*,.xml,.bpmn,.xlsx"
+            onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
+            className="text-xs"
+          />
+          <div className="text-xs text-muted">{files.length ? `${files.length} arquivo(s) selecionado(s)` : "—"}</div>
+          <button
+            type="button"
+            disabled={loading}
+            onClick={createBatch}
+            className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-black disabled:opacity-60"
+          >
+            {loading ? "Criando…" : "Criar lote e enfileirar"}
+          </button>
+        </div>
+      </details>
 
       <div className="flex items-center gap-3">
         <Link className="text-xs underline text-muted" href="/editais/regras">

@@ -1,21 +1,14 @@
-import { PartnersClient } from "@/components/partners/partners-client"
+import { PartnersListClient } from "@/components/partners/partners-list-client"
 import { createClient } from "@/lib/supabase/server"
 
 export default async function ParceirosPage() {
   const supabase = createClient()
 
-  const [{ data: partners }, { data: roles }] = await Promise.all([
-    supabase
-      .from("partners")
-      .select("*, focals:partner_focal_points(*)")
-      .order("name", { ascending: true }),
-    supabase.from("partner_contact_roles").select("*").order("name", { ascending: true }),
-  ])
+  const { data: partners } = await supabase
+    .from("partners")
+    .select("id,name,segment,website,logo_url,priority,active")
+    .order("priority", { ascending: false })
+    .order("name", { ascending: true })
 
-  const normalized = (partners ?? []).map((p: any) => ({
-    ...p,
-    tags: Array.isArray(p.tags) ? p.tags : [],
-  }))
-
-  return <PartnersClient initialPartners={normalized} initialRoles={roles ?? []} />
+  return <PartnersListClient initialPartners={(partners ?? []) as any} />
 }

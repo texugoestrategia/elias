@@ -8,9 +8,8 @@ const defaultNavItems = [
   { href: "/time", label: "Time" },
   { href: "/processos", label: "Processos" },
   { href: "/editais", label: "Editais" },
-  { href: "/relatorios/parceiros", label: "Relatórios" },
-  { href: "/configuracoes/aparencia", label: "Aparência" },
-  { href: "/configuracoes/layout", label: "Layout" },
+  { href: "/relatorios", label: "Relatórios" },
+  { href: "/configuracoes", label: "Configurações" },
 ]
 
 function applySidebarLayout(

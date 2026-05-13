@@ -1,5 +1,6 @@
 import { LayoutSettings } from "@/components/settings/layout-settings"
 import { createClient } from "@/lib/supabase/server"
+import Link from "next/link"
 
 const sidebarItems = [
   { id: "/", label: "Dashboard" },
@@ -7,9 +8,8 @@ const sidebarItems = [
   { id: "/time", label: "Time" },
   { id: "/processos", label: "Processos" },
   { id: "/editais", label: "Editais" },
-  { id: "/relatorios/parceiros", label: "Relatórios" },
-  { id: "/configuracoes/aparencia", label: "Aparência" },
-  { id: "/configuracoes/layout", label: "Layout" },
+  { id: "/relatorios", label: "Relatórios" },
+  { id: "/configuracoes", label: "Configurações" },
 ]
 
 const dashboardItems = [
@@ -38,11 +38,18 @@ export default async function LayoutPage() {
     : ([{ data: null }, { data: null }] as any)
 
   return (
-    <LayoutSettings
-      sidebarItems={sidebarItems as any}
-      dashboardItems={dashboardItems as any}
-      initialSidebar={sidebarRow?.data?.value ?? null}
-      initialDashboard={dashRow?.data?.value ?? null}
-    />
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <Link href="/configuracoes" className="text-xs underline text-muted">
+          ← Voltar para Configurações
+        </Link>
+      </div>
+      <LayoutSettings
+        sidebarItems={sidebarItems as any}
+        dashboardItems={dashboardItems as any}
+        initialSidebar={sidebarRow?.data?.value ?? null}
+        initialDashboard={dashRow?.data?.value ?? null}
+      />
+    </div>
   )
 }

@@ -11,6 +11,8 @@ type Partner = {
   cnpj: string | null
   segment: string | null
   website: string | null
+  logo_url: string | null
+  priority: number
   notes: string | null
   tags: string[]
   active: boolean
@@ -58,6 +60,14 @@ type CatalogItem = {
   name: string
   description: string | null
   image_url: string | null
+  meddpicc_metrics?: string | null
+  meddpicc_economic_buyer?: string | null
+  meddpicc_decision_criteria?: string | null
+  meddpicc_decision_process?: string | null
+  meddpicc_paper_process?: string | null
+  meddpicc_identify_pain?: string | null
+  meddpicc_champion?: string | null
+  meddpicc_competition?: string | null
   tags: string[]
   active: boolean
   created_at: string
@@ -74,21 +84,36 @@ type CatalogArticle = {
   updated_at: string
 }
 
+type PartnerMaterial = {
+  id: string
+  partner_id: string
+  title: string
+  type: "general" | "deck" | "one_pager" | "case" | "datasheet" | "video" | "link"
+  storage_path: string | null
+  public_url: string | null
+  notes: string | null
+  tags: string[]
+  created_at: string
+  updated_at: string
+}
+
 export function PartnersClient({
   initialPartners,
   initialRoles,
+  initialSelectedPartnerId,
 }: {
   initialPartners: Partner[]
   initialRoles: PartnerRole[]
+  initialSelectedPartnerId?: string | null
 }) {
   const supabase = useMemo(() => createClient(), [])
 
   const [partners, setPartners] = useState<Partner[]>(initialPartners)
   const [roles, setRoles] = useState<PartnerRole[]>(initialRoles)
   const [selectedPartnerId, setSelectedPartnerId] = useState<string | null>(
-    initialPartners[0]?.id ?? null
+    initialSelectedPartnerId ?? initialPartners[0]?.id ?? null
   )
-  const [tab, setTab] = useState<"focals" | "catalog">("focals")
+  const [tab, setTab] = useState<"focals" | "catalog" | "materials">("focals")
 
   const [q, setQ] = useState("")
   const [loading, setLoading] = useState(false)
@@ -107,6 +132,7 @@ export function PartnersClient({
         supabase
           .from("partners")
           .select("*, focals:partner_focal_points(*)")
+          .order("priority", { ascending: false })
           .order("name", { ascending: true }),
         supabase.from("partner_contact_roles").select("*").order("name", { ascending: true }),
       ])
@@ -215,6 +241,59 @@ export function PartnersClient({
     }
   }
 
+  const uploadPartnerLogo = async (partnerId: string, file: File) => {
+    setError(null)
+    setLoading(true)
+    try {
+      const path = `partner/${partnerId}/logo/${Date.now()}-${file.name}`
+      const { error: upErr } = await supabase.storage.from("partner-assets").upload(path, file, { upsert: true })
+      if (upErr) throw upErr
+      const { data } = supabase.storage.from("partner-assets").getPublicUrl(path)
+      const { error } = await supabase
+        .from("partners")
+        .update({ logo_url: data.publicUrl, updated_at: new Date().toISOString() })
+        .eq("id", partnerId)
+      if (error) throw error
+      await reload()
+    } catch (e: any) {
+      setError(e?.message ?? "Falha ao enviar logo")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const bumpPriority = async (partnerId: string, delta: number) => {
+    if (!selected) return
+    setError(null)
+    setLoading(true)
+    try {
+      const next = (selected.priority ?? 0) + delta
+      const { error } = await supabase.from("partners").update({ priority: next, updated_at: new Date().toISOString() }).eq("id", partnerId)
+      if (error) throw error
+      await reload()
+    } catch (e: any) {
+      setError(e?.message ?? "Falha ao priorizar")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const deletePartner = async (partnerId: string) => {
+    if (!confirm("Tem certeza que deseja remover este parceiro? Isso remove também pontos focais, catálogo e materiais.")) return
+    setError(null)
+    setLoading(true)
+    try {
+      const { error } = await supabase.from("partners").delete().eq("id", partnerId)
+      if (error) throw error
+      await reload()
+      setSelectedPartnerId(null)
+    } catch (e: any) {
+      setError(e?.message ?? "Falha ao remover parceiro")
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
@@ -272,8 +351,22 @@ export function PartnersClient({
                   (p.id === selectedPartnerId ? "bg-background/70 border border-border" : "")
                 }
               >
-                <div className="text-sm font-medium truncate">{p.name}</div>
-                <div className="text-xs text-muted truncate">{p.segment ?? "—"}</div>
+                <div className="flex items-center gap-2">
+                  <div className="h-8 w-8 rounded-md border border-border bg-background overflow-hidden shrink-0 flex items-center justify-center">
+                    {p.logo_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={p.logo_url} alt="" className="h-full w-full object-contain" />
+                    ) : (
+                      <span className="text-[10px] text-muted">{p.name.slice(0, 2).toUpperCase()}</span>
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium truncate">{p.name}</div>
+                    <div className="text-xs text-muted truncate">
+                      {(p.segment ?? "—") + ` • prioridade ${p.priority ?? 0}`}
+                    </div>
+                  </div>
+                </div>
               </button>
             ))}
           </div>
@@ -292,6 +385,73 @@ export function PartnersClient({
                     <div className="text-xs text-muted truncate">
                       {(selected.segment ?? "—") + (selected.website ? ` • ${selected.website}` : "")}
                     </div>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <div className="text-xs text-muted">Prioridade: {selected.priority ?? 0}</div>
+                    <details className="mt-2 rounded-md border border-border bg-background p-2">
+                      <summary className="cursor-pointer text-xs font-medium">Mais ações</summary>
+                      <div className="mt-2 space-y-2">
+                        <div className="text-xs text-muted">Ajustar prioridade</div>
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            type="button"
+                            onClick={() => bumpPriority(selected.id, 1)}
+                            className="rounded-md border border-border bg-surface px-2 py-1 text-xs hover:border-foreground/20"
+                          >
+                            +
+                          </button>
+                          <div className="text-sm font-semibold w-6 text-center">{selected.priority ?? 0}</div>
+                          <button
+                            type="button"
+                            onClick={() => bumpPriority(selected.id, -1)}
+                            className="rounded-md border border-border bg-surface px-2 py-1 text-xs hover:border-foreground/20"
+                          >
+                            −
+                          </button>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => deletePartner(selected.id)}
+                          className="w-full rounded-md border border-danger/30 bg-danger/10 px-3 py-1.5 text-xs text-danger hover:border-danger/60"
+                        >
+                          Remover parceiro
+                        </button>
+                      </div>
+                    </details>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
+                  <div className="rounded-md border border-border bg-background p-3 space-y-2">
+                    <div className="text-xs text-muted">Logo do parceiro</div>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      disabled={loading}
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0]
+                        if (!file) return
+                        await uploadPartnerLogo(selected.id, file)
+                        e.target.value = ""
+                      }}
+                      className="text-xs"
+                    />
+                    {selected.logo_url ? (
+                      <a className="text-xs underline text-muted" href={selected.logo_url} target="_blank">
+                        Abrir logo
+                      </a>
+                    ) : (
+                      <div className="text-xs text-muted">Sem logo ainda.</div>
+                    )}
+                  </div>
+                  <div className="rounded-md border border-border bg-background p-3 space-y-2">
+                    <div className="text-xs text-muted">Website</div>
+                    {selected.website ? (
+                      <a className="text-xs underline" href={selected.website} target="_blank">
+                        {selected.website}
+                      </a>
+                    ) : (
+                      <div className="text-xs text-muted">—</div>
+                    )}
                   </div>
                 </div>
                 <div className="pt-2">
@@ -326,10 +486,22 @@ export function PartnersClient({
                   >
                     Catálogo
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => setTab("materials")}
+                    className={
+                      "rounded-md border border-border px-3 py-1.5 text-xs " +
+                      (tab === "materials" ? "bg-background" : "bg-surface hover:border-foreground/20")
+                    }
+                  >
+                    Materiais
+                  </button>
                   <div className="text-xs text-muted">
                     {tab === "catalog"
-                      ? "Produtos/serviços por categoria, com imagem e artigos internos."
-                      : "Contatos do parceiro (sem login externo)."}
+                      ? "Produtos/serviços por categoria, com imagem, MEDDPICC e artigos internos."
+                      : tab === "materials"
+                        ? "Materiais de divulgação (PDFs, decks, links)."
+                        : "Contatos do parceiro (sem login externo)."}
                   </div>
                 </div>
               </div>
@@ -374,8 +546,10 @@ export function PartnersClient({
                     ) : null}
                   </div>
                 </div>
-              ) : (
+              ) : tab === "catalog" ? (
                 <PartnerCatalog partnerId={selected.id} />
+              ) : (
+                <PartnerMaterials partnerId={selected.id} />
               )}
             </>
           ) : (
@@ -993,6 +1167,18 @@ function CatalogItemDetails({
 }) {
   const [title, setTitle] = useState("")
   const [content, setContent] = useState("")
+  const supabase = useMemo(() => createClient(), [])
+  const [med, setMed] = useState(() => ({
+    metrics: item.meddpicc_metrics ?? "",
+    economic_buyer: item.meddpicc_economic_buyer ?? "",
+    decision_criteria: item.meddpicc_decision_criteria ?? "",
+    decision_process: item.meddpicc_decision_process ?? "",
+    paper_process: item.meddpicc_paper_process ?? "",
+    identify_pain: item.meddpicc_identify_pain ?? "",
+    champion: item.meddpicc_champion ?? "",
+    competition: item.meddpicc_competition ?? "",
+  }))
+  const [savingMed, setSavingMed] = useState(false)
 
   return (
     <div className="rounded-md border border-border bg-background p-3 space-y-3">
@@ -1018,6 +1204,69 @@ function CatalogItemDetails({
           </a>
         ) : null}
       </div>
+
+      <details className="rounded-md border border-border bg-surface p-2">
+        <summary className="text-sm cursor-pointer">MEDDPICC (por item)</summary>
+        <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2">
+          <Field label="Metrics" value={med.metrics} onChange={(v) => setMed((m) => ({ ...m, metrics: v }))} />
+          <Field
+            label="Economic Buyer"
+            value={med.economic_buyer}
+            onChange={(v) => setMed((m) => ({ ...m, economic_buyer: v }))}
+          />
+          <Field
+            label="Decision Criteria"
+            value={med.decision_criteria}
+            onChange={(v) => setMed((m) => ({ ...m, decision_criteria: v }))}
+          />
+          <Field
+            label="Decision Process"
+            value={med.decision_process}
+            onChange={(v) => setMed((m) => ({ ...m, decision_process: v }))}
+          />
+          <Field
+            label="Paper Process"
+            value={med.paper_process}
+            onChange={(v) => setMed((m) => ({ ...m, paper_process: v }))}
+          />
+          <Field
+            label="Identify Pain"
+            value={med.identify_pain}
+            onChange={(v) => setMed((m) => ({ ...m, identify_pain: v }))}
+          />
+          <Field label="Champion" value={med.champion} onChange={(v) => setMed((m) => ({ ...m, champion: v }))} />
+          <Field
+            label="Competition"
+            value={med.competition}
+            onChange={(v) => setMed((m) => ({ ...m, competition: v }))}
+          />
+        </div>
+        <button
+          type="button"
+          disabled={loading || savingMed}
+          onClick={async () => {
+            setSavingMed(true)
+            await supabase
+              .from("partner_catalog_items")
+              .update({
+                meddpicc_metrics: med.metrics || null,
+                meddpicc_economic_buyer: med.economic_buyer || null,
+                meddpicc_decision_criteria: med.decision_criteria || null,
+                meddpicc_decision_process: med.decision_process || null,
+                meddpicc_paper_process: med.paper_process || null,
+                meddpicc_identify_pain: med.identify_pain || null,
+                meddpicc_champion: med.champion || null,
+                meddpicc_competition: med.competition || null,
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", item.id)
+            setSavingMed(false)
+          }}
+          className="mt-2 rounded-md border border-border bg-background px-3 py-2 text-sm hover:border-foreground/20 disabled:opacity-60"
+        >
+          Salvar MEDDPICC
+        </button>
+      </details>
 
       <div className="pt-2 border-t border-border space-y-2">
         <div className="text-sm font-medium">Artigos (internos)</div>
@@ -1060,6 +1309,217 @@ function CatalogItemDetails({
             ))}
           {!item.articles?.length ? <div className="text-xs text-muted">Nenhum artigo ainda.</div> : null}
         </div>
+      </div>
+    </div>
+  )
+}
+
+function Field({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  return (
+    <label className="block space-y-1">
+      <div className="text-[11px] text-muted">{label}</div>
+      <textarea
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm min-h-16"
+      />
+    </label>
+  )
+}
+
+function PartnerMaterials({ partnerId }: { partnerId: string }) {
+  const supabase = useMemo(() => createClient(), [])
+  const [items, setItems] = useState<PartnerMaterial[]>([])
+  const [title, setTitle] = useState("")
+  const [type, setType] = useState<PartnerMaterial["type"]>("general")
+  const [url, setUrl] = useState("")
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const reload = async () => {
+    setError(null)
+    setLoading(true)
+    try {
+      const { data, error } = await supabase
+        .from("partner_marketing_materials")
+        .select("*")
+        .eq("partner_id", partnerId)
+        .order("created_at", { ascending: false })
+      if (error) throw error
+      setItems((data ?? []).map((x: any) => ({ ...x, tags: Array.isArray(x.tags) ? x.tags : [] })))
+    } catch (e: any) {
+      setError(e?.message ?? "Falha ao carregar materiais")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    reload()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [partnerId])
+
+  const uploadFile = async (file: File) => {
+    setError(null)
+    setLoading(true)
+    try {
+      if (!title.trim()) throw new Error("Informe o título.")
+      const path = `partner/${partnerId}/materials/${Date.now()}-${file.name}`
+      const { error: upErr } = await supabase.storage.from("partner-assets").upload(path, file, { upsert: true })
+      if (upErr) throw upErr
+      const { data } = supabase.storage.from("partner-assets").getPublicUrl(path)
+
+      const { error } = await supabase.from("partner_marketing_materials").insert({
+        partner_id: partnerId,
+        title: title.trim(),
+        type,
+        storage_path: path,
+        public_url: data.publicUrl,
+        notes: null,
+        tags: [],
+      })
+      if (error) throw error
+      setTitle("")
+      setType("general")
+      await reload()
+    } catch (e: any) {
+      setError(e?.message ?? "Falha ao enviar material")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const addLink = async () => {
+    setError(null)
+    setLoading(true)
+    try {
+      if (!title.trim()) throw new Error("Informe o título.")
+      if (!url.trim()) throw new Error("Informe a URL.")
+      const { error } = await supabase.from("partner_marketing_materials").insert({
+        partner_id: partnerId,
+        title: title.trim(),
+        type: "link",
+        storage_path: null,
+        public_url: url.trim(),
+        notes: null,
+        tags: [],
+      })
+      if (error) throw error
+      setTitle("")
+      setUrl("")
+      await reload()
+    } catch (e: any) {
+      setError(e?.message ?? "Falha ao adicionar link")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const remove = async (id: string) => {
+    if (!confirm("Remover material?")) return
+    setError(null)
+    setLoading(true)
+    try {
+      const { error } = await supabase.from("partner_marketing_materials").delete().eq("id", id)
+      if (error) throw error
+      await reload()
+    } catch (e: any) {
+      setError(e?.message ?? "Falha ao remover")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="rounded-lg border border-border bg-surface p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="text-sm font-medium">Materiais de divulgação</div>
+        <button
+          type="button"
+          onClick={reload}
+          className="rounded-md border border-border bg-background px-3 py-1.5 text-xs hover:border-foreground/20"
+        >
+          {loading ? "Atualizando…" : "Atualizar"}
+        </button>
+      </div>
+
+      {error ? <div className="text-sm text-danger">{error}</div> : null}
+
+      <div className="rounded-md border border-border bg-background p-3 space-y-2">
+        <div className="text-xs text-muted">Adicionar material</div>
+        <input
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm"
+          placeholder="Título (ex.: Apresentação comercial)"
+        />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+          <select
+            value={type}
+            onChange={(e) => setType(e.target.value as any)}
+            className="rounded-md border border-border bg-surface px-3 py-2 text-sm"
+          >
+            <option value="general">Geral</option>
+            <option value="deck">Deck</option>
+            <option value="one_pager">One-pager</option>
+            <option value="case">Case</option>
+            <option value="datasheet">Datasheet</option>
+            <option value="video">Vídeo</option>
+          </select>
+          <input
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            className="md:col-span-2 rounded-md border border-border bg-surface px-3 py-2 text-sm"
+            placeholder="URL (opcional) — para links"
+          />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+          <input
+            type="file"
+            disabled={loading}
+            onChange={async (e) => {
+              const file = e.target.files?.[0]
+              if (!file) return
+              await uploadFile(file)
+              e.target.value = ""
+            }}
+            className="text-xs"
+          />
+          <button
+            type="button"
+            disabled={loading || !title.trim() || !url.trim()}
+            onClick={addLink}
+            className="rounded-md border border-border bg-surface px-3 py-2 text-sm hover:border-foreground/20 disabled:opacity-60"
+          >
+            Adicionar link
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+        {items.map((m) => (
+          <div key={m.id} className="rounded-md border border-border bg-background p-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-sm font-medium truncate">{m.title}</div>
+                <div className="text-xs text-muted">{m.type}</div>
+                {m.public_url ? (
+                  <a className="text-xs underline text-muted" href={m.public_url} target="_blank">
+                    Abrir
+                  </a>
+                ) : null}
+              </div>
+              <button
+                type="button"
+                onClick={() => remove(m.id)}
+                className="rounded-md border border-border bg-surface px-3 py-1.5 text-xs hover:border-foreground/20"
+              >
+                Remover
+              </button>
+            </div>
+          </div>
+        ))}
+        {!items.length ? <div className="text-xs text-muted">Nenhum material cadastrado ainda.</div> : null}
       </div>
     </div>
   )

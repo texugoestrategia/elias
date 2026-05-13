@@ -184,6 +184,8 @@ create table if not exists public.partners (
   cnpj text null,
   segment text null,
   website text null,
+  logo_url text null,
+  priority int not null default 0,
   notes text null,
   tags text[] not null default '{}'::text[],
   active boolean not null default true,
@@ -193,6 +195,7 @@ create table if not exists public.partners (
 
 create index if not exists partners_name_idx on public.partners (name);
 create index if not exists partners_active_idx on public.partners (active);
+create index if not exists partners_priority_idx on public.partners (priority);
 
 create table if not exists public.partner_contact_roles (
   id uuid primary key default gen_random_uuid(),
@@ -218,9 +221,26 @@ create table if not exists public.partner_focal_points (
 create index if not exists partner_focal_points_partner_id_idx
   on public.partner_focal_points (partner_id);
 
+create table if not exists public.partner_marketing_materials (
+  id uuid primary key default gen_random_uuid(),
+  partner_id uuid not null references public.partners(id) on delete cascade,
+  title text not null,
+  type text not null default 'general' check (type in ('general','deck','one_pager','case','datasheet','video','link')),
+  storage_path text null,
+  public_url text null,
+  notes text null,
+  tags text[] not null default '{}'::text[],
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists partner_marketing_materials_partner_id_idx
+  on public.partner_marketing_materials (partner_id);
+
 alter table public.partners enable row level security;
 alter table public.partner_contact_roles enable row level security;
 alter table public.partner_focal_points enable row level security;
+alter table public.partner_marketing_materials enable row level security;
 
 do $$
 begin
@@ -307,6 +327,11 @@ begin
       before update on public.partner_focal_points
       for each row execute function public.set_updated_at();
   end if;
+  if not exists (select 1 from pg_trigger where tgname = 'tr_partner_marketing_materials_updated_at') then
+    create trigger tr_partner_marketing_materials_updated_at
+      before update on public.partner_marketing_materials
+      for each row execute function public.set_updated_at();
+  end if;
 end $$;
 
 -- =========================================
@@ -331,6 +356,14 @@ create table if not exists public.partner_catalog_items (
   name text not null,
   description text null,
   image_url text null,
+  meddpicc_metrics text null,
+  meddpicc_economic_buyer text null,
+  meddpicc_decision_criteria text null,
+  meddpicc_decision_process text null,
+  meddpicc_paper_process text null,
+  meddpicc_identify_pain text null,
+  meddpicc_champion text null,
+  meddpicc_competition text null,
   tags text[] not null default '{}'::text[],
   active boolean not null default true,
   created_at timestamptz not null default now(),
@@ -959,6 +992,22 @@ begin
   if not exists (select 1 from pg_policies where schemaname='public' and tablename='partner_focal_points' and policyname='partner_focal_points_write_permission') then
     create policy "partner_focal_points_write_permission"
       on public.partner_focal_points
+      for all
+      to authenticated
+      using (public.has_permission('partners.manage'))
+      with check (public.has_permission('partners.manage'));
+  end if;
+
+  if not exists (select 1 from pg_policies where schemaname='public' and tablename='partner_marketing_materials' and policyname='partner_marketing_materials_select_authenticated') then
+    create policy "partner_marketing_materials_select_authenticated"
+      on public.partner_marketing_materials
+      for select
+      to authenticated
+      using (true);
+  end if;
+  if not exists (select 1 from pg_policies where schemaname='public' and tablename='partner_marketing_materials' and policyname='partner_marketing_materials_write_permission') then
+    create policy "partner_marketing_materials_write_permission"
+      on public.partner_marketing_materials
       for all
       to authenticated
       using (public.has_permission('partners.manage'))

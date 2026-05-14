@@ -73,6 +73,13 @@ export function PartnersListClient({ initialPartners }: { initialPartners: Partn
         </div>
         <div className="flex items-center gap-2">
           <Link
+            href="/parceiros/certificacoes"
+            className="rounded-md border border-border bg-background px-3 py-2 text-sm hover:border-foreground/20"
+            title="Guia: como funcionam as certificações de parceiros"
+          >
+            Certificações
+          </Link>
+          <Link
             href="/parceiros/gerenciar"
             className="rounded-md bg-accent px-3 py-2 text-sm font-medium text-black"
             title="Área de gestão (admin)"
@@ -159,4 +166,3 @@ export function PartnersListClient({ initialPartners }: { initialPartners: Partn
     </div>
   )
 }
-

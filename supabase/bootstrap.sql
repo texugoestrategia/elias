@@ -195,15 +195,31 @@ create table if not exists public.partners (
   updated_at timestamptz not null default now()
 );
 
+-- Migração idempotente (caso a tabela partners já exista sem as colunas novas)
+alter table public.partners add column if not exists key text null;
+alter table public.partners add column if not exists logo_url text null;
+alter table public.partners add column if not exists priority int not null default 0;
+alter table public.partners add column if not exists is_internal boolean not null default false;
+
 do $$
 begin
-  if not exists (
+  if exists (
     select 1
-    from pg_constraint
-    where conname = 'partners_key_unique'
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'partners'
+      and column_name = 'key'
   ) then
-    alter table public.partners
-      add constraint partners_key_unique unique (key);
+    if not exists (
+      select 1
+      from pg_constraint
+      where conname = 'partners_key_unique'
+    ) then
+      alter table public.partners
+        add constraint partners_key_unique unique (key);
+    end if;
+  else
+    raise notice 'Coluna public.partners.key não existe; pulando criação da constraint partners_key_unique.';
   end if;
 end $$;
 

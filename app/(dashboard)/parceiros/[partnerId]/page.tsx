@@ -31,12 +31,17 @@ export default async function ParceiroDetalhesPage({ params }: { params: { partn
         <Link href="/parceiros" className="text-xs underline text-muted">
           ← Voltar para parceiros
         </Link>
-        <Link
-          href={`/parceiros/gerenciar?partnerId=${partnerId}`}
-          className="rounded-md bg-accent px-3 py-2 text-sm font-medium text-black"
-        >
-          Gerenciar
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link href="/parceiros/certificacoes" className="text-xs underline text-muted">
+            Certificações
+          </Link>
+          <Link
+            href={`/parceiros/gerenciar?partnerId=${partnerId}`}
+            className="rounded-md bg-accent px-3 py-2 text-sm font-medium text-black"
+          >
+            Gerenciar
+          </Link>
+        </div>
       </div>
 
       <div className="rounded-lg border border-border bg-surface p-4">

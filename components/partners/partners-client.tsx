@@ -873,11 +873,21 @@ function PartnerCatalog({ partnerId }: { partnerId: string }) {
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [message, setMessage] = useState<string | null>(null)
+
+  // gestão de categoria (node)
+  const [nodeDraftName, setNodeDraftName] = useState("")
+  const [deleteMode, setDeleteMode] = useState(false)
+  const [deleteChoice, setDeleteChoice] = useState<"move_existing" | "move_new" | "move_uncategorized">("move_existing")
+  const [targetExistingNodeId, setTargetExistingNodeId] = useState<string>("")
+  const [targetNewNodeName, setTargetNewNodeName] = useState<string>("")
 
   const selectedItem = useMemo(() => items.find((i) => i.id === selectedItemId) ?? null, [items, selectedItemId])
+  const selectedNode = useMemo(() => nodes.find((n) => n.id === selectedNodeId) ?? null, [nodes, selectedNodeId])
 
   const reload = async () => {
     setError(null)
+    setMessage(null)
     setLoading(true)
     try {
       const [{ data: nodeData, error: nErr }, { data: itemData, error: iErr }] = await Promise.all([
@@ -898,8 +908,118 @@ function PartnerCatalog({ partnerId }: { partnerId: string }) {
       setNodes(nodeData ?? [])
       setItems((itemData ?? []).map((x: any) => ({ ...x, tags: Array.isArray(x.tags) ? x.tags : [] })))
       if (!selectedNodeId && (nodeData?.[0]?.id ?? null)) setSelectedNodeId(nodeData?.[0]?.id ?? null)
+      const sel = (nodeData ?? []).find((n: any) => n.id === (selectedNodeId ?? (nodeData?.[0]?.id ?? null)))
+      if (sel) setNodeDraftName(sel.name ?? "")
     } catch (e: any) {
       setError(e?.message ?? "Falha ao carregar catálogo")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const descendantsOf = useMemo(() => {
+    const byParent = new Map<string | null, CatalogNode[]>()
+    for (const n of nodes) {
+      const k = n.parent_id ?? null
+      byParent.set(k, [...(byParent.get(k) ?? []), n])
+    }
+    return (rootId: string): string[] => {
+      const out: string[] = []
+      const stack = [rootId]
+      while (stack.length) {
+        const id = stack.pop()!
+        out.push(id)
+        for (const child of byParent.get(id) ?? []) stack.push(child.id)
+      }
+      return out
+    }
+  }, [nodes])
+
+  const ensureSemCategoria = async (): Promise<string> => {
+    const existing = nodes.find(
+      (n) => n.partner_id === partnerId && (n.name ?? "").trim().toLowerCase() === "sem categoria"
+    )
+    if (existing) return existing.id
+    const { data, error } = await supabase
+      .from("partner_catalog_nodes")
+      .insert({ partner_id: partnerId, parent_id: null, name: "Sem categoria", description: null, sort_order: 9999 })
+      .select("id")
+      .single()
+    if (error) throw error
+    return data.id as string
+  }
+
+  const renameSelectedNode = async () => {
+    if (!selectedNodeId) return
+    setError(null)
+    setMessage(null)
+    setLoading(true)
+    try {
+      const name = nodeDraftName.trim()
+      if (!name) throw new Error("Nome da categoria é obrigatório.")
+      const { error } = await supabase
+        .from("partner_catalog_nodes")
+        .update({ name, updated_at: new Date().toISOString() })
+        .eq("id", selectedNodeId)
+      if (error) throw error
+      setMessage("Categoria atualizada.")
+      await reload()
+    } catch (e: any) {
+      setError(e?.message ?? "Falha ao renomear categoria")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const deleteSelectedNodeSafely = async () => {
+    if (!selectedNodeId) return
+    if ((selectedNode?.name ?? "").trim().toLowerCase() === "sem categoria") {
+      setError("A categoria “Sem categoria” não pode ser removida.")
+      return
+    }
+    setError(null)
+    setMessage(null)
+    setLoading(true)
+    try {
+      const nodeIds = descendantsOf(selectedNodeId)
+      const affected = items.filter((it) => nodeIds.includes(it.node_id))
+
+      if (affected.length) {
+        let targetNodeId: string
+        if (deleteChoice === "move_existing") {
+          if (!targetExistingNodeId) throw new Error("Selecione a nova categoria de destino.")
+          targetNodeId = targetExistingNodeId
+        } else if (deleteChoice === "move_new") {
+          const name = targetNewNodeName.trim()
+          if (!name) throw new Error("Informe o nome da nova categoria.")
+          const { data, error } = await supabase
+            .from("partner_catalog_nodes")
+            .insert({ partner_id: partnerId, parent_id: null, name, description: null, sort_order: 0 })
+            .select("id")
+            .single()
+          if (error) throw error
+          targetNodeId = data.id as string
+        } else {
+          targetNodeId = await ensureSemCategoria()
+        }
+
+        const { error: uErr } = await supabase
+          .from("partner_catalog_items")
+          .update({ node_id: targetNodeId, updated_at: new Date().toISOString() })
+          .in("node_id", nodeIds)
+        if (uErr) throw uErr
+      }
+
+      const { error: dErr } = await supabase.from("partner_catalog_nodes").delete().eq("id", selectedNodeId)
+      if (dErr) throw dErr
+
+      setSelectedNodeId(null)
+      setSelectedItemId(null)
+      setDeleteMode(false)
+      setMessage("Categoria removida.")
+      await reload()
+    } catch (e: any) {
+      setError(e?.message ?? "Falha ao remover categoria")
     } finally {
       setLoading(false)
     }
@@ -921,8 +1041,9 @@ function PartnerCatalog({ partnerId }: { partnerId: string }) {
 
   const visibleItems = useMemo(() => {
     if (!selectedNodeId) return items
-    return items.filter((i) => i.node_id === selectedNodeId)
-  }, [items, selectedNodeId])
+    const ids = new Set(descendantsOf(selectedNodeId))
+    return items.filter((i) => ids.has(i.node_id))
+  }, [items, selectedNodeId, descendantsOf])
 
   const createNode = async (payload: Partial<CatalogNode>) => {
     setError(null)
@@ -971,7 +1092,7 @@ function PartnerCatalog({ partnerId }: { partnerId: string }) {
     setError(null)
     setLoading(true)
     try {
-      const path = `partner/${partnerId}/items/${itemId}/${Date.now()}-${file.name}`
+      const path = `partner/${partnerId}/items/${itemId}/${Date.now()}-${safeStorageFileName(file.name)}`
       const { error: upErr } = await supabase.storage.from("partner-assets").upload(path, file, { upsert: true })
       if (upErr) throw upErr
       const { data } = supabase.storage.from("partner-assets").getPublicUrl(path)
@@ -1006,6 +1127,24 @@ function PartnerCatalog({ partnerId }: { partnerId: string }) {
     }
   }
 
+  const deleteItem = async (itemId: string) => {
+    if (!confirm("Remover este item do catálogo?")) return
+    setError(null)
+    setMessage(null)
+    setLoading(true)
+    try {
+      const { error } = await supabase.from("partner_catalog_items").delete().eq("id", itemId)
+      if (error) throw error
+      setSelectedItemId(null)
+      setMessage("Item removido.")
+      await reload()
+    } catch (e: any) {
+      setError(e?.message ?? "Falha ao remover item")
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
     <div className="rounded-lg border border-border bg-surface p-4 space-y-3">
       <div className="flex items-center justify-between">
@@ -1020,17 +1159,139 @@ function PartnerCatalog({ partnerId }: { partnerId: string }) {
       </div>
 
       {error ? <div className="text-sm text-danger">{error}</div> : null}
+      {message ? <div className="text-sm text-muted">{message}</div> : null}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
         <div className="space-y-3">
           <div className="text-xs text-muted">Categorias</div>
           <CatalogNodeCreate nodes={nodes} selectedNodeId={selectedNodeId} onCreate={createNode} loading={loading} />
+          {selectedNode ? (
+            <details className="rounded-md border border-border bg-background p-3">
+              <summary className="cursor-pointer text-sm font-medium">Gerenciar categoria</summary>
+              <div className="mt-3 space-y-2">
+                <label className="block space-y-1">
+                  <div className="text-xs text-muted">Nome</div>
+                  <input
+                    value={nodeDraftName}
+                    onChange={(e) => setNodeDraftName(e.target.value)}
+                    className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm"
+                  />
+                </label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    disabled={loading || !selectedNodeId}
+                    onClick={renameSelectedNode}
+                    className="rounded-md border border-border bg-surface px-3 py-2 text-sm hover:border-foreground/20 disabled:opacity-60"
+                  >
+                    Salvar
+                  </button>
+                  <button
+                    type="button"
+                    disabled={loading || !selectedNodeId}
+                    onClick={() => {
+                      setDeleteMode((v) => !v)
+                      setDeleteChoice("move_existing")
+                      setTargetExistingNodeId("")
+                      setTargetNewNodeName("")
+                    }}
+                    className="rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger hover:border-danger/60 disabled:opacity-60"
+                  >
+                    Remover…
+                  </button>
+                </div>
+
+                {deleteMode ? (
+                  <div className="rounded-md border border-border bg-surface p-3 space-y-3">
+                    <div className="text-xs text-muted">
+                      Se houver itens nessa categoria (ou subcategorias), escolha o destino antes de remover.
+                    </div>
+                    <div className="space-y-2">
+                      <label className="flex items-start gap-2 text-sm">
+                        <input
+                          type="radio"
+                          name="deleteChoice"
+                          checked={deleteChoice === "move_existing"}
+                          onChange={() => setDeleteChoice("move_existing")}
+                        />
+                        <span>Indicar a nova categoria já existente</span>
+                      </label>
+                      {deleteChoice === "move_existing" ? (
+                        <select
+                          value={targetExistingNodeId}
+                          onChange={(e) => setTargetExistingNodeId(e.target.value)}
+                          className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                        >
+                          <option value="">Selecione…</option>
+                          {nodes
+                            .filter((n) => n.partner_id === partnerId && n.id !== selectedNodeId)
+                            .map((n) => (
+                              <option key={n.id} value={n.id}>
+                                {n.name}
+                              </option>
+                            ))}
+                        </select>
+                      ) : null}
+
+                      <label className="flex items-start gap-2 text-sm">
+                        <input type="radio" name="deleteChoice" checked={deleteChoice === "move_new"} onChange={() => setDeleteChoice("move_new")} />
+                        <span>Cadastrar uma nova categoria</span>
+                      </label>
+                      {deleteChoice === "move_new" ? (
+                        <input
+                          value={targetNewNodeName}
+                          onChange={(e) => setTargetNewNodeName(e.target.value)}
+                          className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                          placeholder="Nome da nova categoria"
+                        />
+                      ) : null}
+
+                      <label className="flex items-start gap-2 text-sm">
+                        <input
+                          type="radio"
+                          name="deleteChoice"
+                          checked={deleteChoice === "move_uncategorized"}
+                          onChange={() => setDeleteChoice("move_uncategorized")}
+                        />
+                        <span>Deixar sem categoria (criar/usar “Sem categoria”)</span>
+                      </label>
+                    </div>
+
+                    <div className="flex justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setDeleteMode(false)}
+                        className="rounded-md border border-border bg-background px-3 py-2 text-sm hover:border-foreground/20"
+                        disabled={loading}
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={deleteSelectedNodeSafely}
+                        className="rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger hover:border-danger/60 disabled:opacity-60"
+                        disabled={loading}
+                      >
+                        Confirmar remoção
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            </details>
+          ) : null}
           <div className="rounded-md border border-border bg-background p-2 space-y-1">
             <NodeTree
               byParent={nodeTree.byParent}
               parentId={null}
               selectedNodeId={selectedNodeId}
-              onSelect={setSelectedNodeId}
+              onSelect={(id) => {
+                setSelectedNodeId(id)
+                setSelectedItemId(null)
+                const n = nodes.find((x) => x.id === id)
+                setNodeDraftName(n?.name ?? "")
+                setDeleteMode(false)
+              }}
             />
           </div>
         </div>
@@ -1089,6 +1350,7 @@ function PartnerCatalog({ partnerId }: { partnerId: string }) {
               item={selectedItem}
               onUploadImage={uploadItemImage}
               onAddArticle={addArticle}
+              onDelete={deleteItem}
               loading={loading}
             />
           ) : (
@@ -1266,11 +1528,13 @@ function CatalogItemDetails({
   item,
   onUploadImage,
   onAddArticle,
+  onDelete,
   loading,
 }: {
   item: CatalogItem
   onUploadImage: (itemId: string, file: File) => Promise<void>
   onAddArticle: (itemId: string, title: string, content: string) => Promise<void>
+  onDelete: (itemId: string) => Promise<void>
   loading: boolean
 }) {
   const [title, setTitle] = useState("")
@@ -1290,7 +1554,22 @@ function CatalogItemDetails({
 
   return (
     <div className="rounded-md border border-border bg-background p-3 space-y-3">
-      <div className="text-sm font-medium">Detalhes: {item.name}</div>
+      <div className="flex items-start justify-between gap-3">
+        <div className="text-sm font-medium">Detalhes: {item.name}</div>
+        <details className="rounded-md border border-border bg-surface p-2">
+          <summary className="cursor-pointer text-xs font-medium">Mais ações</summary>
+          <div className="mt-2">
+            <button
+              type="button"
+              disabled={loading}
+              onClick={() => onDelete(item.id)}
+              className="w-full rounded-md border border-danger/30 bg-danger/10 px-3 py-1.5 text-xs text-danger hover:border-danger/60 disabled:opacity-60"
+            >
+              Remover item
+            </button>
+          </div>
+        </details>
+      </div>
 
       <div className="space-y-2">
         <div className="text-xs text-muted">Imagem de identificação</div>

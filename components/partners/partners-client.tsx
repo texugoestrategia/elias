@@ -119,6 +119,8 @@ export function PartnersClient({
   const [q, setQ] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [message, setMessage] = useState<string | null>(null)
+  const [editPartner, setEditPartner] = useState<Partial<Partner>>({})
 
   const selected = useMemo(
     () => partners.find((p) => p.id === selectedPartnerId) ?? null,
@@ -127,6 +129,7 @@ export function PartnersClient({
 
   const reload = async () => {
     setError(null)
+    setMessage(null)
     setLoading(true)
     try {
       const [{ data: partnersData, error: pErr }, { data: rolesData, error: rErr }] = await Promise.all([
@@ -145,6 +148,34 @@ export function PartnersClient({
       setRoles(rolesData ?? [])
     } catch (e: any) {
       setError(e?.message ?? "Falha ao carregar parceiros")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const savePartnerBasics = async () => {
+    if (!selected) return
+    setError(null)
+    setMessage(null)
+    setLoading(true)
+    try {
+      const patch: any = {
+        name: String(editPartner.name ?? selected.name ?? "").trim(),
+        legal_name: (editPartner.legal_name ?? selected.legal_name) || null,
+        cnpj: (editPartner.cnpj ?? selected.cnpj) || null,
+        segment: (editPartner.segment ?? selected.segment) || null,
+        website: (editPartner.website ?? selected.website) || null,
+        notes: (editPartner.notes ?? selected.notes) || null,
+        updated_at: new Date().toISOString(),
+      }
+      if (!patch.name) throw new Error("Nome é obrigatório.")
+      const { error } = await supabase.from("partners").update(patch).eq("id", selected.id)
+      if (error) throw error
+      setMessage("Parceiro atualizado.")
+      setEditPartner({})
+      await reload()
+    } catch (e: any) {
+      setError(e?.message ?? "Falha ao atualizar parceiro")
     } finally {
       setLoading(false)
     }
@@ -318,6 +349,9 @@ export function PartnersClient({
       {error ? (
         <div className="rounded-md border border-danger/30 bg-danger/10 p-3 text-sm text-danger">{error}</div>
       ) : null}
+      {message ? (
+        <div className="rounded-md border border-border bg-surface p-3 text-sm text-muted">{message}</div>
+      ) : null}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <section className="lg:col-span-1 space-y-3">
@@ -455,6 +489,70 @@ export function PartnersClient({
                     )}
                   </div>
                 </div>
+
+                <details className="rounded-md border border-border bg-background p-3">
+                  <summary className="cursor-pointer text-sm font-medium">Editar dados do parceiro</summary>
+                  <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <label className="block space-y-1">
+                      <div className="text-xs text-muted">Nome</div>
+                      <input
+                        value={String(editPartner.name ?? selected.name ?? "")}
+                        onChange={(e) => setEditPartner((p) => ({ ...p, name: e.target.value }))}
+                        className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm"
+                      />
+                    </label>
+                    <label className="block space-y-1">
+                      <div className="text-xs text-muted">Nome legal</div>
+                      <input
+                        value={String(editPartner.legal_name ?? selected.legal_name ?? "")}
+                        onChange={(e) => setEditPartner((p) => ({ ...p, legal_name: e.target.value }))}
+                        className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm"
+                      />
+                    </label>
+                    <label className="block space-y-1">
+                      <div className="text-xs text-muted">CNPJ</div>
+                      <input
+                        value={String(editPartner.cnpj ?? selected.cnpj ?? "")}
+                        onChange={(e) => setEditPartner((p) => ({ ...p, cnpj: e.target.value }))}
+                        className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm"
+                      />
+                    </label>
+                    <label className="block space-y-1">
+                      <div className="text-xs text-muted">Segmento</div>
+                      <input
+                        value={String(editPartner.segment ?? selected.segment ?? "")}
+                        onChange={(e) => setEditPartner((p) => ({ ...p, segment: e.target.value }))}
+                        className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm"
+                      />
+                    </label>
+                    <label className="block space-y-1 md:col-span-2">
+                      <div className="text-xs text-muted">Website</div>
+                      <input
+                        value={String(editPartner.website ?? selected.website ?? "")}
+                        onChange={(e) => setEditPartner((p) => ({ ...p, website: e.target.value }))}
+                        className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm"
+                      />
+                    </label>
+                    <label className="block space-y-1 md:col-span-2">
+                      <div className="text-xs text-muted">Notas</div>
+                      <textarea
+                        value={String(editPartner.notes ?? selected.notes ?? "")}
+                        onChange={(e) => setEditPartner((p) => ({ ...p, notes: e.target.value }))}
+                        className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm min-h-24"
+                      />
+                    </label>
+                  </div>
+                  <div className="mt-3 flex justify-end">
+                    <button
+                      type="button"
+                      disabled={loading}
+                      onClick={savePartnerBasics}
+                      className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-black disabled:opacity-60"
+                    >
+                      Salvar alterações
+                    </button>
+                  </div>
+                </details>
                 <div className="pt-2">
                   <div className="text-xs text-muted mb-1">Tags</div>
                   <TagInput
@@ -962,6 +1060,15 @@ function PartnerCatalog({ partnerId }: { partnerId: string }) {
                     <div className="text-sm font-medium truncate">{it.name}</div>
                     <div className="text-xs text-muted truncate">
                       {(it.kind === "product" ? "Produto" : "Serviço") + (it.description ? ` • ${it.description}` : "")}
+                    </div>
+                    <div className="mt-2">
+                      <a
+                        href={`/catalogo/${it.id}`}
+                        className="text-xs underline text-muted"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        Abrir página completa
+                      </a>
                     </div>
                     <div className="mt-2 flex flex-wrap gap-1">
                       {(it.tags ?? []).slice(0, 6).map((t) => (

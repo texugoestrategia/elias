@@ -179,6 +179,7 @@ end $$;
 -- =========================================
 create table if not exists public.partners (
   id uuid primary key default gen_random_uuid(),
+  key text null,
   name text not null,
   legal_name text null,
   cnpj text null,
@@ -186,12 +187,32 @@ create table if not exists public.partners (
   website text null,
   logo_url text null,
   priority int not null default 0,
+  is_internal boolean not null default false,
   notes text null,
   tags text[] not null default '{}'::text[],
   active boolean not null default true,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'partners_key_unique'
+  ) then
+    alter table public.partners
+      add constraint partners_key_unique unique (key);
+  end if;
+end $$;
+
+-- Parceiro interno (nossa empresa)
+insert into public.partners (key, name, is_internal, priority, active)
+values ('active_solutions', 'Active Solutions', true, 100, true)
+on conflict (key) do update
+set name = excluded.name,
+    is_internal = true;
 
 create index if not exists partners_name_idx on public.partners (name);
 create index if not exists partners_active_idx on public.partners (active);
@@ -355,7 +376,13 @@ create table if not exists public.partner_catalog_items (
   kind text not null default 'service' check (kind in ('product','service')),
   name text not null,
   description text null,
+  long_description text null,
   image_url text null,
+  price_amount numeric null,
+  price_currency text null default 'BRL',
+  price_notes text null,
+  datasheet_storage_path text null,
+  datasheet_url text null,
   meddpicc_metrics text null,
   meddpicc_economic_buyer text null,
   meddpicc_decision_criteria text null,
@@ -366,6 +393,37 @@ create table if not exists public.partner_catalog_items (
   meddpicc_competition text null,
   tags text[] not null default '{}'::text[],
   active boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.partner_catalog_item_relations (
+  id uuid primary key default gen_random_uuid(),
+  item_id uuid not null references public.partner_catalog_items(id) on delete cascade,
+  related_item_id uuid not null references public.partner_catalog_items(id) on delete cascade,
+  relation_type text not null default 'related' check (relation_type in ('related','bundle','alternative','addon','requires')),
+  notes text null,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.partner_catalog_item_images (
+  id uuid primary key default gen_random_uuid(),
+  item_id uuid not null references public.partner_catalog_items(id) on delete cascade,
+  storage_path text null,
+  public_url text null,
+  caption text null,
+  sort_order int not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.partner_catalog_item_requirements (
+  id uuid primary key default gen_random_uuid(),
+  item_id uuid not null references public.partner_catalog_items(id) on delete cascade,
+  kind text not null default 'technical' check (kind in ('technical','commercial','legal','delivery')),
+  title text not null,
+  description text null,
+  priority int not null default 0,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -382,12 +440,19 @@ create table if not exists public.partner_catalog_item_articles (
 alter table public.partner_catalog_nodes enable row level security;
 alter table public.partner_catalog_items enable row level security;
 alter table public.partner_catalog_item_articles enable row level security;
+alter table public.partner_catalog_item_relations enable row level security;
+alter table public.partner_catalog_item_images enable row level security;
+alter table public.partner_catalog_item_requirements enable row level security;
 
 create index if not exists partner_catalog_nodes_partner_id_idx on public.partner_catalog_nodes (partner_id);
 create index if not exists partner_catalog_nodes_parent_id_idx on public.partner_catalog_nodes (parent_id);
 create index if not exists partner_catalog_items_partner_id_idx on public.partner_catalog_items (partner_id);
 create index if not exists partner_catalog_items_node_id_idx on public.partner_catalog_items (node_id);
 create index if not exists partner_catalog_item_articles_item_id_idx on public.partner_catalog_item_articles (item_id);
+create unique index if not exists partner_catalog_item_relations_unique on public.partner_catalog_item_relations (item_id, related_item_id, relation_type);
+create index if not exists partner_catalog_item_relations_item_id_idx on public.partner_catalog_item_relations (item_id);
+create index if not exists partner_catalog_item_images_item_id_idx on public.partner_catalog_item_images (item_id);
+create index if not exists partner_catalog_item_requirements_item_id_idx on public.partner_catalog_item_requirements (item_id);
 
 -- triggers updated_at
 do $$
@@ -405,6 +470,16 @@ begin
   if not exists (select 1 from pg_trigger where tgname = 'tr_partner_catalog_item_articles_updated_at') then
     create trigger tr_partner_catalog_item_articles_updated_at
       before update on public.partner_catalog_item_articles
+      for each row execute function public.set_updated_at();
+  end if;
+  if not exists (select 1 from pg_trigger where tgname = 'tr_partner_catalog_item_images_updated_at') then
+    create trigger tr_partner_catalog_item_images_updated_at
+      before update on public.partner_catalog_item_images
+      for each row execute function public.set_updated_at();
+  end if;
+  if not exists (select 1 from pg_trigger where tgname = 'tr_partner_catalog_item_requirements_updated_at') then
+    create trigger tr_partner_catalog_item_requirements_updated_at
+      before update on public.partner_catalog_item_requirements
       for each row execute function public.set_updated_at();
   end if;
 end $$;
@@ -1057,6 +1132,54 @@ begin
   if not exists (select 1 from pg_policies where schemaname='public' and tablename='partner_catalog_item_articles' and policyname='partner_catalog_item_articles_write_permission') then
     create policy "partner_catalog_item_articles_write_permission"
       on public.partner_catalog_item_articles
+      for all
+      to authenticated
+      using (public.has_permission('catalog.manage'))
+      with check (public.has_permission('catalog.manage'));
+  end if;
+
+  if not exists (select 1 from pg_policies where schemaname='public' and tablename='partner_catalog_item_images' and policyname='partner_catalog_item_images_select_authenticated') then
+    create policy "partner_catalog_item_images_select_authenticated"
+      on public.partner_catalog_item_images
+      for select
+      to authenticated
+      using (true);
+  end if;
+  if not exists (select 1 from pg_policies where schemaname='public' and tablename='partner_catalog_item_images' and policyname='partner_catalog_item_images_write_permission') then
+    create policy "partner_catalog_item_images_write_permission"
+      on public.partner_catalog_item_images
+      for all
+      to authenticated
+      using (public.has_permission('catalog.manage'))
+      with check (public.has_permission('catalog.manage'));
+  end if;
+
+  if not exists (select 1 from pg_policies where schemaname='public' and tablename='partner_catalog_item_requirements' and policyname='partner_catalog_item_requirements_select_authenticated') then
+    create policy "partner_catalog_item_requirements_select_authenticated"
+      on public.partner_catalog_item_requirements
+      for select
+      to authenticated
+      using (true);
+  end if;
+  if not exists (select 1 from pg_policies where schemaname='public' and tablename='partner_catalog_item_requirements' and policyname='partner_catalog_item_requirements_write_permission') then
+    create policy "partner_catalog_item_requirements_write_permission"
+      on public.partner_catalog_item_requirements
+      for all
+      to authenticated
+      using (public.has_permission('catalog.manage'))
+      with check (public.has_permission('catalog.manage'));
+  end if;
+
+  if not exists (select 1 from pg_policies where schemaname='public' and tablename='partner_catalog_item_relations' and policyname='partner_catalog_item_relations_select_authenticated') then
+    create policy "partner_catalog_item_relations_select_authenticated"
+      on public.partner_catalog_item_relations
+      for select
+      to authenticated
+      using (true);
+  end if;
+  if not exists (select 1 from pg_policies where schemaname='public' and tablename='partner_catalog_item_relations' and policyname='partner_catalog_item_relations_write_permission') then
+    create policy "partner_catalog_item_relations_write_permission"
+      on public.partner_catalog_item_relations
       for all
       to authenticated
       using (public.has_permission('catalog.manage'))

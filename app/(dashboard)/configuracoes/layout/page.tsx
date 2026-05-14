@@ -5,6 +5,7 @@ import Link from "next/link"
 const sidebarItems = [
   { id: "/", label: "Dashboard" },
   { id: "/parceiros", label: "Parceiros" },
+  { id: "/catalogo", label: "Catálogo" },
   { id: "/time", label: "Time" },
   { id: "/processos", label: "Processos" },
   { id: "/editais", label: "Editais" },
@@ -14,6 +15,7 @@ const sidebarItems = [
 
 const dashboardItems = [
   { id: "/parceiros", label: "Parceiros", description: "Acessar módulo de parceiros" },
+  { id: "/catalogo", label: "Catálogo", description: "Produtos/serviços para propostas" },
   { id: "/time", label: "Time", description: "Gestão do time e skills" },
   { id: "/processos", label: "Processos", description: "Fluxos e acompanhamento" },
   { id: "/editais", label: "Editais", description: "Gestão de editais" },

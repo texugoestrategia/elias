@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server"
 
 const defaultShortcuts = [
   { href: "/parceiros", label: "Parceiros" },
+  { href: "/catalogo", label: "Catálogo" },
   { href: "/time", label: "Time" },
   { href: "/processos", label: "Processos" },
   { href: "/editais", label: "Editais" },

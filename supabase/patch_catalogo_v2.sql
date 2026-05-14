@@ -1,0 +1,153 @@
+-- Patch Catálogo v2 (Produtos/Serviços) — página dedicada + campos ricos
+-- Rode no Supabase (SQL Editor) após já ter partners.sql + partners_catalog.sql do projeto.
+
+begin;
+
+-- Campos ricos no item
+alter table public.partner_catalog_items add column if not exists long_description text null;
+alter table public.partner_catalog_items add column if not exists price_amount numeric null;
+alter table public.partner_catalog_items add column if not exists price_currency text null default 'BRL';
+alter table public.partner_catalog_items add column if not exists price_notes text null;
+alter table public.partner_catalog_items add column if not exists datasheet_storage_path text null;
+alter table public.partner_catalog_items add column if not exists datasheet_url text null;
+
+-- Galeria de imagens por item
+create table if not exists public.partner_catalog_item_images (
+  id uuid primary key default gen_random_uuid(),
+  item_id uuid not null references public.partner_catalog_items(id) on delete cascade,
+  storage_path text null,
+  public_url text null,
+  caption text null,
+  sort_order int not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists partner_catalog_item_images_item_id_idx
+  on public.partner_catalog_item_images(item_id);
+
+-- Relações entre itens (interno/externo/outros parceiros)
+create table if not exists public.partner_catalog_item_relations (
+  id uuid primary key default gen_random_uuid(),
+  item_id uuid not null references public.partner_catalog_items(id) on delete cascade,
+  related_item_id uuid not null references public.partner_catalog_items(id) on delete cascade,
+  relation_type text not null default 'related' check (relation_type in ('related','bundle','alternative','addon','requires')),
+  notes text null,
+  created_at timestamptz not null default now()
+);
+create unique index if not exists partner_catalog_item_relations_unique
+  on public.partner_catalog_item_relations(item_id, related_item_id, relation_type);
+
+-- Requisitos por item (para proposta e pré-vendas)
+create table if not exists public.partner_catalog_item_requirements (
+  id uuid primary key default gen_random_uuid(),
+  item_id uuid not null references public.partner_catalog_items(id) on delete cascade,
+  kind text not null default 'technical' check (kind in ('technical','commercial','legal','delivery')),
+  title text not null,
+  description text null,
+  priority int not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists partner_catalog_item_requirements_item_id_idx
+  on public.partner_catalog_item_requirements(item_id);
+
+-- Triggers updated_at (se função set_updated_at existir)
+do $$
+begin
+  if exists(select 1 from pg_proc where proname='set_updated_at') then
+    if not exists (select 1 from pg_trigger where tgname = 'tr_partner_catalog_item_images_updated_at') then
+      create trigger tr_partner_catalog_item_images_updated_at
+        before update on public.partner_catalog_item_images
+        for each row execute function public.set_updated_at();
+    end if;
+    if not exists (select 1 from pg_trigger where tgname = 'tr_partner_catalog_item_requirements_updated_at') then
+      create trigger tr_partner_catalog_item_requirements_updated_at
+        before update on public.partner_catalog_item_requirements
+        for each row execute function public.set_updated_at();
+    end if;
+  end if;
+end $$;
+
+-- RLS + policies
+alter table public.partner_catalog_item_images enable row level security;
+alter table public.partner_catalog_item_requirements enable row level security;
+alter table public.partner_catalog_item_relations enable row level security;
+
+do $$
+declare
+  has_perm boolean;
+begin
+  select exists(select 1 from pg_proc where proname = 'has_permission') into has_perm;
+
+  if not exists (select 1 from pg_policies where schemaname='public' and tablename='partner_catalog_item_images' and policyname='partner_catalog_item_images_select') then
+    create policy "partner_catalog_item_images_select"
+      on public.partner_catalog_item_images
+      for select
+      to authenticated
+      using (true);
+  end if;
+  if not exists (select 1 from pg_policies where schemaname='public' and tablename='partner_catalog_item_requirements' and policyname='partner_catalog_item_requirements_select') then
+    create policy "partner_catalog_item_requirements_select"
+      on public.partner_catalog_item_requirements
+      for select
+      to authenticated
+      using (true);
+  end if;
+  if not exists (select 1 from pg_policies where schemaname='public' and tablename='partner_catalog_item_relations' and policyname='partner_catalog_item_relations_select') then
+    create policy "partner_catalog_item_relations_select"
+      on public.partner_catalog_item_relations
+      for select
+      to authenticated
+      using (true);
+  end if;
+
+  drop policy if exists "partner_catalog_item_images_write" on public.partner_catalog_item_images;
+  drop policy if exists "partner_catalog_item_requirements_write" on public.partner_catalog_item_requirements;
+  drop policy if exists "partner_catalog_item_relations_write" on public.partner_catalog_item_relations;
+
+  if has_perm then
+    create policy "partner_catalog_item_images_write"
+      on public.partner_catalog_item_images
+      for all
+      to authenticated
+      using (public.has_permission('catalog.manage'))
+      with check (public.has_permission('catalog.manage'));
+
+    create policy "partner_catalog_item_requirements_write"
+      on public.partner_catalog_item_requirements
+      for all
+      to authenticated
+      using (public.has_permission('catalog.manage'))
+      with check (public.has_permission('catalog.manage'));
+
+    create policy "partner_catalog_item_relations_write"
+      on public.partner_catalog_item_relations
+      for all
+      to authenticated
+      using (public.has_permission('catalog.manage'))
+      with check (public.has_permission('catalog.manage'));
+  else
+    create policy "partner_catalog_item_images_write"
+      on public.partner_catalog_item_images
+      for all
+      to authenticated
+      using (true)
+      with check (true);
+
+    create policy "partner_catalog_item_requirements_write"
+      on public.partner_catalog_item_requirements
+      for all
+      to authenticated
+      using (true)
+      with check (true);
+
+    create policy "partner_catalog_item_relations_write"
+      on public.partner_catalog_item_relations
+      for all
+      to authenticated
+      using (true)
+      with check (true);
+  end if;
+end $$;
+
+commit;

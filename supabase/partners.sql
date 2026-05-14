@@ -6,6 +6,7 @@ create extension if not exists "pgcrypto";
 -- Parceiros
 create table if not exists public.partners (
   id uuid primary key default gen_random_uuid(),
+  key text null,
   name text not null,
   legal_name text null,
   cnpj text null,
@@ -13,12 +14,25 @@ create table if not exists public.partners (
   website text null,
   logo_url text null,
   priority int not null default 0,
+  is_internal boolean not null default false,
   notes text null,
   tags text[] not null default '{}'::text[],
   active boolean not null default true,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'partners_key_unique'
+  ) then
+    alter table public.partners
+      add constraint partners_key_unique unique (key);
+  end if;
+end $$;
 
 create index if not exists partners_name_idx on public.partners (name);
 create index if not exists partners_active_idx on public.partners (active);
